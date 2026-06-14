@@ -1,0 +1,2 @@
+{"type":"assistant","uuid":"m-0001","parentUuid":null,"timestamp":"2026-06-14T15:56:48.752Z","agentId":"aecfc998031eb0576","isSidechain":true,"sessionId":"redacted-session-dev","cwd":"/work/project","gitBranch":"main","message":{"role":"assistant","content":[{"type":"text","text":"first line is valid"}]}}
+{"type":"assistant","uuid":"m-0002","parentUuid":"m-0001","timestamp": THIS_IS_NOT_VALID_JSON }
