@@ -11,3 +11,10 @@ development_status:
   1-3: done
   1-4: done
   1-5: done
+  # Epic 2 — The Playable Arena (Battle Model + Renderer)
+  epic-2: in-progress
+  2-1: backlog
+  2-2: backlog
+  2-3: backlog
+  2-4: backlog
+  2-5: backlog
