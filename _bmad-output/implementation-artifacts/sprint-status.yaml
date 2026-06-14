@@ -1,12 +1,13 @@
 generated: 2026-06-14
 last_updated: 2026-06-14
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
+# 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 project: dev-chronicles
 # Epic 1 — The Deterministic Battle Core
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1: done
   1-2: done
   1-3: done
   1-4: done
-  1-5: backlog
+  1-5: done

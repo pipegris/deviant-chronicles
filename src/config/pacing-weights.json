@@ -1,0 +1,21 @@
+{
+  "$schemaVersion": 1,
+  "weights": {
+    "idle": 1,
+    "scout": 2,
+    "aetherStorm": 5,
+    "counter": 8,
+    "melee": 10,
+    "spell": 12,
+    "summon": 15
+  },
+  "modifiers": {
+    "mirageStrike": 4,
+    "solidStrike": 2,
+    "bossDamage": 6,
+    "resolveDrain": 5
+  },
+  "dwell": {
+    "dwellMsPerWeightUnit": 120
+  }
+}

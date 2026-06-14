@@ -1,0 +1,144 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Story 1.5 AC3/Task7 — the GOLDEN BattleTimeline snapshot (the NFR-2 determinism anchor) > pace(translate(runIngest())) matches the committed golden snapshot 1`] = `
+{
+  "beats": [
+    {
+      "actionType": "scout",
+      "dwellMs": 240,
+      "orderKey": {
+        "logicalClock": 0,
+        "seqWithinStream": 0,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0001",
+        "u-0002#1",
+        "u-0002#2",
+        "u-0003#0",
+      ],
+      "weight": 2,
+    },
+    {
+      "actionType": "melee",
+      "dwellMs": 2400,
+      "orderKey": {
+        "logicalClock": 4,
+        "seqWithinStream": 4,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0004#0",
+      ],
+      "weight": 20,
+    },
+    {
+      "actionType": "melee",
+      "dwellMs": 1920,
+      "orderKey": {
+        "logicalClock": 5,
+        "seqWithinStream": 5,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0005#0",
+      ],
+      "weight": 16,
+    },
+    {
+      "actionType": "melee",
+      "dwellMs": 2400,
+      "orderKey": {
+        "logicalClock": 6,
+        "seqWithinStream": 6,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0006#0",
+      ],
+      "weight": 20,
+    },
+    {
+      "actionType": "melee",
+      "dwellMs": 1920,
+      "orderKey": {
+        "logicalClock": 7,
+        "seqWithinStream": 7,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0007#0",
+      ],
+      "weight": 16,
+    },
+    {
+      "actionType": "spell",
+      "dwellMs": 1440,
+      "orderKey": {
+        "logicalClock": 8,
+        "seqWithinStream": 8,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0008#0",
+      ],
+      "weight": 12,
+    },
+    {
+      "actionType": "counter",
+      "dwellMs": 1560,
+      "orderKey": {
+        "logicalClock": 9,
+        "seqWithinStream": 9,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0009#0",
+      ],
+      "weight": 13,
+    },
+    {
+      "actionType": "scout",
+      "dwellMs": 240,
+      "orderKey": {
+        "logicalClock": 10,
+        "seqWithinStream": 10,
+        "streamId": "aecfc998031eb0576",
+      },
+      "sourceEventIds": [
+        "u-0010#0",
+        "u-0011#0",
+      ],
+      "weight": 2,
+    },
+    {
+      "actionType": "idle",
+      "dwellMs": 120,
+      "orderKey": {
+        "logicalClock": 12,
+        "seqWithinStream": 0,
+        "streamId": "orchestrator",
+      },
+      "sourceEventIds": [
+        "phase-dev-OPAQUEHASH-1#started",
+      ],
+      "weight": 1,
+    },
+    {
+      "actionType": "melee",
+      "dwellMs": 1920,
+      "orderKey": {
+        "logicalClock": 13,
+        "seqWithinStream": 1,
+        "streamId": "orchestrator",
+      },
+      "sourceEventIds": [
+        "phase-dev-OPAQUEHASH-1#result",
+      ],
+      "weight": 16,
+    },
+  ],
+  "schemaVersion": 1,
+  "totalDurationMs": 14160,
+}
+`;
