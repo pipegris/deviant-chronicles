@@ -1,0 +1,34 @@
+{
+  "name": "dev-chronicles",
+  "description": "Dev Chronicles — a deterministic, provenance-honest replay of a real Claude Code session rendered as a 16-bit fantasy battle.",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite/config.dev.mjs",
+    "build": "vite build --config vite/config.prod.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "bundle:story-10-1": "node -e \"console.log('bundle:story-10-1 not yet implemented (Epic 5, Story 5.2)'); process.exit(0)\""
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "0.104.1",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.3",
+    "eslint": "^9.39.4",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import": "^2.32.0",
+    "jiti": "^2.7.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.61.0",
+    "vite": "^6.3.1",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "phaser": "4.0.0",
+    "terser": "^5.39.0",
+    "zod": "4.4.3"
+  }
+}
