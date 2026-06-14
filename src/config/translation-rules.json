@@ -1,0 +1,112 @@
+{
+  "$schemaVersion": 1,
+  "rules": [
+    {
+      "id": "aether-storm",
+      "match": {
+        "eventType": "journal_result",
+        "subtypeIn": ["overload", "synth_failure", "rate_limit", "backoff", "network_wait", "error_529"]
+      },
+      "emit": {
+        "actionType": "aetherStorm",
+        "isAetherStorm": true
+      }
+    },
+    {
+      "id": "aether-storm-result",
+      "match": {
+        "eventType": "tool_result",
+        "isError": true,
+        "contentPattern": "(?i)(\\b529\\b|overload|rate.?limit|backoff|network ?wait|too many requests|service unavailable)"
+      },
+      "emit": {
+        "actionType": "aetherStorm",
+        "isAetherStorm": true
+      }
+    },
+    {
+      "id": "bash-spell",
+      "match": {
+        "eventType": "tool_use",
+        "toolName": ["Bash"],
+        "commandPattern": "^(?:pnpm|npm|npx|yarn)(?: run| exec)? (?:test|build|lint|typecheck)(?![\\w-])|^(?:pnpm|npm|npx|yarn)(?: run| exec)? (?:vitest|tsc|eslint|jest)\\b|\\b(?:vitest|tsc|eslint|jest)\\b"
+      },
+      "emit": {
+        "actionType": "spell",
+        "opensStrike": true
+      }
+    },
+    {
+      "id": "edit-write-melee",
+      "match": {
+        "eventType": "tool_use",
+        "toolName": ["Edit", "Write"]
+      },
+      "emit": {
+        "actionType": "melee",
+        "problemIntegrityDelta": -10,
+        "isMirageCandidate": true,
+        "opensStrike": true
+      }
+    },
+    {
+      "id": "read-scout",
+      "match": {
+        "eventType": "tool_use",
+        "toolName": ["Read", "Grep", "Glob"]
+      },
+      "emit": {
+        "actionType": "scout"
+      }
+    },
+    {
+      "id": "task-summon",
+      "match": {
+        "eventType": "tool_use",
+        "toolName": ["Task"]
+      },
+      "emit": {
+        "actionType": "summon"
+      }
+    },
+    {
+      "id": "result-fail-counter",
+      "match": {
+        "eventType": "tool_result",
+        "isError": true
+      },
+      "emit": {
+        "actionType": "counter",
+        "resolveDelta": -8
+      }
+    },
+    {
+      "id": "result-pass-damage",
+      "match": {
+        "eventType": "tool_result",
+        "isError": false,
+        "resolvesStrike": true
+      },
+      "emit": {
+        "actionType": "melee",
+        "problemIntegrityDelta": -6
+      }
+    },
+    {
+      "id": "journal-pass-damage",
+      "match": {
+        "eventType": "journal_result",
+        "subtypeIn": ["pass", "complete"]
+      },
+      "emit": {
+        "actionType": "melee",
+        "problemIntegrityDelta": -6
+      }
+    }
+  ],
+  "default": {
+    "actionType": "idle",
+    "resolveDelta": 0,
+    "problemIntegrityDelta": 0
+  }
+}
