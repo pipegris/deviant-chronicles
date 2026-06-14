@@ -39,3 +39,6 @@ _bmad/
 *.sw?
 
 # Committed (NOT ignored): _bmad-output/, .omc/workflows/, public/bundles/, all source + config
+
+# Private raw source sessions (real transcripts; redacted fixtures are committed under src/ingest/__fixtures__/)
+.sources/
