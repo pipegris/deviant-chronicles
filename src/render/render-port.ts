@@ -35,5 +35,18 @@ export interface RenderPort {
   // guards the call (`adapter.renderBeatBehaviors?.(...)`). The real PhaserRenderAdapter implements it
   // concretely. [story Task 3 "Option A"; architecture.md#R5 L239-241]
   renderBeatBehaviors?(prev: BattleState, next: BattleState, beats: Beat[], view: AnnotatedView): void;
+  // The DEV-ONLY preview command (Story 3.4): play the THUNDORR cinematic on demand over `snapshot`
+  // so the operator can watch it (the committed fixture omits the production `summon` tag). One-way
+  // like the other commands — it returns void and pushes NOTHING back upstream. OPTIONAL (`?`) so the
+  // additive extension stays BACKWARD-COMPATIBLE (a fake adapter without it still satisfies RenderPort;
+  // the boot guards the call). The real PhaserRenderAdapter drives the scene's cinematic; main.ts gates
+  // the boot hook behind import.meta.env.DEV so this never runs in production. [story Task 3]
+  previewSummonCinematic?(snapshot: BattleState): void;
+  // The lone read-only QUERY on this otherwise one-way command interface (Story 3.4 fix F1/F2): is the
+  // renderer's cinematic mid-play? The scene's cinematic machine is the single source of truth for when
+  // the cutaway reaches `done`; the boot OBSERVES this to suspend/resume the forward tick (it pushes
+  // nothing upstream and never moves the cursor, so the one-way data flow is intact). OPTIONAL (`?`) so
+  // a pre-3.4 fake without it still satisfies RenderPort — the boot guards the call. [review F1/F2]
+  isCinematicActive?(): boolean;
   destroy(): void;
 }

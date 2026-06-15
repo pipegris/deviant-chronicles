@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T05:30:00Z
+last_updated: 2026-06-15T08:00:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -205,5 +205,90 @@ development_status:
   # anthropic in dist, BOTH golden snapshots (pace/+ingest/) byte-stable. No git commit. epic-3 stays
   # in-progress (3-3 is not the Epic-3 capstone).
   3-3: done
-  3-4: backlog
+  # 3-4 moved backlog -> ready-for-dev (create-story). The THUNDORR summon CINEMATIC (FR-8, NFR-1) —
+  # the demo's emotional peak. Builds ON Story 3.3's Eidolon-Summon behavior intent (the production
+  # trigger: planBeatBehaviors emits { target:'eidolon', behavior:'summon' } on a summon-tagged
+  # charged-gauge breakthrough; arena-scene.playBeatBehaviors currently runs a PLACEHOLDER flash —
+  # this story ELEVATES it to a full-scene set-piece). THREE deliverables: (1) src/render/
+  # summon-cinematic.ts = a PURE, Phaser-free, node-testable STATE MACHINE (idle -> cutaway -> blow ->
+  # depart -> done; elapsedMs-threshold driven so one machine serves both the rAF cadence AND a
+  # synchronous test) SEPARABLE from the Phaser tweens — the testability decision (jsdom does not
+  # advance Phaser timers, so a tween-chain would make the sequence operator-only; the pure machine
+  # makes the SEQUENCE gate-provable, the animation-plan.ts/beat-behavior.ts posture); (2) a THIN
+  # FAIL-CLOSED Phaser cinematic consumer (a DRIVEN set-piece on PLACEHOLDER art — reuse environment
+  # Overlay/flash/lunge/fadeOut; real THUNDORR art is Story 5.3's manifest swap) whose phase advances
+  # off the render-side cadence NOT a tween onComplete (so HEADLESS reaches `done`); (3) a DEV-ONLY
+  # preview trigger (?cinematic=summon URL flag guarded by import.meta.env.DEV -> tree-shaken from the
+  # prod build, + an exported ArenaHandle.previewSummonCinematic() hook = the testable surface) so the
+  # operator can WATCH it now — the committed FixtureInterpreter omits `summon` by design (Story
+  # 3.1/3.3, thin slice), so the production trigger never fires in the dev fixture. CRITICAL: the dev
+  # preview plays the cinematic DIRECTLY over the current snapshot — it does NOT inject a fake summon
+  # into fixture-interpreter.ts / the production overlay (the prod overlay stays dispel+shaman only).
+  # CLEAN RETURN (R1: restore, don't recompute) = the cinematic captures the reducer's `next` snapshot
+  # (already foldBattleState(timeline,cursor) truth — the SCRUB==PLAY guarantee, playback.ts L96-113)
+  # and on `done` re-applies it via the SNAP path (applySnapshot); it NEVER constructs/mutates a
+  # BattleState. Advance-during-cinematic is SUSPENDED (a cinematic-active guard in advanceIfPlaying,
+  # the Story 2.5 status-gate extension — reducer state untouched, so resume is trivially clean; no
+  # auto-pause [deferred to 4.2], reducer NOT modified). Wiring is SURGICAL + ONE-WAY: the trigger
+  # rides the EXISTING renderBeatBehaviors seam (NO new RenderPort method, NO new Layer-0 path, NO new
+  # beat tag). Gate-PROVABLE: the state-machine transitions (enter->blow->depart->return) + clamp +
+  # determinism + R1 data-level (no BattleState/mechanics field); the trigger fires on the summon
+  # intent (unit, hand-built — fixture omits summon, the 3.3/2.4 honest-gap precedent); CLEAN RETURN
+  # (post-cinematic the applied snapshot == foldBattleState(timeline,cursor) + reducer state unchanged);
+  # the dev hook plays without mutating the prod overlay; a headless boot smoke (the cinematic runs to
+  # `done` + cast survives + clean-return snap fires, no throw). OPERATOR-verified (NOT gate-proven):
+  # the full-scene spectacle, first-time-viewer legibility, ~60fps no-jank (NFR-1) — watch
+  # `pnpm dev` ?cinematic=summon. NOT Story 3.5 (Shaman/Dispel cinematics), NOT final art (5.3).
+  # Gates: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts UNCHANGED — DCE drops the dev flag in
+  # prod), full suite green (baseline 55 files/539 tests at HEAD ce5292e), BOTH golden snapshots
+  # (pace/+ingest/) byte-stable (no Layer-0 code added), build OK + grep -ril anthropic dist/ = NOTHING
+  # (cinematic+dev hook are SDK-free). epic-3 stays in-progress (3-4 is not the first story in epic-3).
+  # 3-4 ready-for-dev -> in-progress -> review (dev-story). The THUNDORR summon CINEMATIC (FR-8, NFR-1) —
+  # the demo's emotional peak, built ON Story 3.3's Eidolon-Summon behavior intent. THREE deliverables:
+  # (1) src/render/summon-cinematic.ts = a PURE, Phaser-free, node-testable STATE MACHINE
+  # (idle->cutaway->blow->depart->done; elapsedMs-threshold driven so one machine serves the rAF cadence
+  # AND a synchronous test; idle/done absorbing; carries ONLY {phase,elapsedMs} — R1 data-level); (2) a
+  # THIN FAIL-CLOSED Phaser cinematic consumer (a method-cluster on ArenaScene reusing the
+  # environmentOverlay/flash/lunge/fadeOut placeholder primitives — cutaway=freeze overlay, blow=flash+lunge
+  # on the boss stand-in, depart=fade-out, done=clean-return snap; phase advances off Scene.update(delta)
+  # NOT a tween onComplete, + a synchronous advanceCinematicToDone() so HEADLESS reaches done; real THUNDORR
+  # art is Story 5.3's manifest swap); (3) a DEV-ONLY preview trigger (ArenaHandle.previewSummonCinematic()
+  # = the testable seam, + a ?cinematic=summon URL flag in main.ts guarded by import.meta.env.DEV ->
+  # tree-shaken from prod) so the operator can WATCH it now (the committed FixtureInterpreter omits `summon`
+  # by design). CRITICAL: the dev preview plays the cinematic DIRECTLY (a synthesized summon intent handed
+  # to the scene) — it does NOT inject a fake summon into fixture-interpreter.ts / the production overlay
+  # (prod overlay stays dispel+shaman). CLEAN RETURN (R1: restore, don't recompute) = re-apply the reducer's
+  # captured foldBattleState(timeline,cursor) snapshot via the SNAP path; NEVER constructs/mutates a
+  # BattleState. Advance-during-cinematic SUSPENDED via a boot-owned cinematicActive guard in
+  # advanceIfPlaying (Task 2 option A; reducer untouched, resume trivially clean; held-frame overlay keeps
+  # flowing); reducer NOT modified, no auto-pause (deferred 4.2). Wiring SURGICAL + ONE-WAY: the production
+  # trigger rides the EXISTING renderBeatBehaviors seam (the summon intent already there); ADDED an OPTIONAL
+  # backward-compatible RenderPort.previewSummonCinematic?() one-way command for the dev preview (NO new
+  # production seam, NO new Layer-0 path, NO new beat tag). Story 2.5's destroy() rAF-cancel NOT regressed.
+  # Made the 3 ATDD red files green HONESTLY (none deleted/skipped/weakened) + added 1 unit file
+  # (summon-cinematic.unit.test.ts: R1/R4/R5/R2 source greps + threshold edges). Gate-PROVEN: the
+  # state-machine SEQUENCE + clamp + determinism + R1 data shape; the TRIGGER fires on the summon intent and
+  # NOT otherwise; CLEAN RETURN (post-cinematic snapshot == foldBattleState(timeline,cursor) + reducer
+  # cursor/status unchanged); the dev hook plays without mutating the prod overlay; a headless boot smoke
+  # (runs to done + cast survives + clean-return snap, no throw). OPERATOR-verified (NOT a gate — watch
+  # `pnpm dev` then open ?cinematic=summon): the full-scene spectacle, AC2 first-time legibility, ~60fps
+  # no-jank (NFR-1) — jsdom draws nothing / advances no tweens (the arena-animation/arena-behavior
+  # limitation). Honest gap: the production summon-intent positive branch is unit-only (the committed
+  # fixture omits `summon`; fires end-to-end with no code change once the full bundle carries it, Epic 5).
+  # Gates GREEN: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts UNTOUCHED — DCE drops the dev flag,
+  # URLSearchParams count=0 in dist), 59 files / 579 tests (was 55/539: +4 files [3 ATDD + 1 unit], +40
+  # tests), build OK, grep -ril anthropic dist/ = NOTHING (cinematic + dev hook SDK-free), BOTH golden
+  # snapshots (pace/+ingest/) byte-UNCHANGED (no Layer-0 code). NO git commit. NOT Story 3.5 (Shaman/Dispel
+  # cinematics), NOT final art (5.3). epic-3 stays in-progress (3-4 is not the Epic-3 capstone).
+  # 3-4 review -> done (senior-review fix round 1). Review found AC1 PARTIAL: the boot's cinematicActive
+  # flag was set-once-true/never-cleared (F1 high) -> dev preview permanently suspended playback; never set
+  # on the production path (F2 med, latent); the depart fade left the boss invisible after the clean return
+  # (F3 med); the Task-4 resume test was missing (F4). Fix: the scene's cinematic machine is now the SINGLE
+  # source of truth -- advanceIfPlaying polls adapter.isCinematicActive() to clear the boot flag on resume
+  # (F1) + set it on the production summon path (F2); the done clean return kills the depart fade + resets
+  # boss alpha (F3); resume + alpha regression guards added (F4); the dev-hook clean-return fake now records
+  # a genuine scene-snap (F5); doc test counts corrected (F6). Gates re-run GREEN: typecheck/lint 0 (R1/R4/R5
+  # untouched), 59 files / 583 tests (581 pre-fix +2 guards), build OK, grep -ril anthropic dist/ = NOTHING,
+  # BOTH golden snapshots byte-UNCHANGED, no Layer-0 file touched. NO git commit. epic-3 stays in-progress.
+  3-4: done
   3-5: backlog

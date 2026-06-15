@@ -135,6 +135,30 @@ export class PhaserRenderAdapter implements RenderPort {
     // existing pending flush). No buffering of motion that would play stale once boot finishes.
   }
 
+  // The DEV-ONLY preview command (Story 3.4): drive the live scene's THUNDORR cinematic on demand so
+  // the operator can watch it (main.ts gates this behind import.meta.env.DEV via ?cinematic=summon).
+  // It plays the cinematic DIRECTLY by handing the scene a synthesized summon BeatBehaviorIntent — it
+  // does NOT touch the read-only overlay / FixtureInterpreter (no fake `summon` annotation enters the
+  // production path; the scene's playBeatBehaviors elevates the intent into the set-piece). The
+  // snapshot the clean return restores is already captured by the scene (its last applySnapshot); the
+  // boot also re-applies it via render() as the clean-return baseline. A no-op if the scene is still
+  // booting (never throws). One-way — nothing flows back upstream (R5/AC1). [story Task 3]
+  previewSummonCinematic(_snapshot: BattleState): void {
+    void _snapshot; // the scene restores its own captured snapshot on `done`; the boot snaps the baseline
+    const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) {
+      scene.playBeatBehaviors([{ target: 'eidolon', behavior: 'summon', durationMs: 0 }]);
+    }
+  }
+
+  // The read-only cinematic QUERY (Story 3.4 fix F1/F2): false before boot. The boot polls this so the
+  // scene's cinematic machine is the single source of truth for the suspend-guard — letting the boot
+  // resume the forward tick when the cutaway reaches `done`. [review F1/F2]
+  isCinematicActive(): boolean {
+    const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    return scene ? scene.isCinematicActive() : false;
+  }
+
   destroy(): void {
     this.game?.destroy(true);
     this.game = null;

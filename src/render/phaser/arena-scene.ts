@@ -9,6 +9,16 @@ import type { BeatBehaviorIntent } from '../beat-behavior';
 import { toRenderModel } from '../render-model';
 import { initialBattleState } from '../../model/battle-model';
 import {
+  advanceSummon,
+  initialSummonState,
+  startSummon,
+  CUTAWAY_MS,
+  BLOW_MS,
+  DEPART_MS,
+  SUMMON_CINEMATIC_TOTAL_MS,
+} from '../summon-cinematic';
+import type { SummonCinematicPhase, SummonCinematicState } from '../summon-cinematic';
+import {
   DEFAULT_ASSET_MANIFEST,
   generatePlaceholderTextures,
   placeholderSpec,
@@ -62,6 +72,17 @@ export class ArenaScene extends Phaser.Scene {
   // silently skipped. No pixels are inspected; HEADLESS draws nothing.
   private lastPlayed: AnimationIntent[] = [];
 
+  // ---- the THUNDORR-summon cinematic (Story 3.4) ----
+  // The pure cinematic STATE (idle at rest). The scene DRIVES its Phaser set-piece FROM this phase;
+  // the sequence + the terminal `done` (where the clean return fires) are gate-provable off the pure
+  // summon-cinematic machine. Render-side transient state — never serialized, never pushed upstream
+  // (R5/AC1). [story Task 3]
+  private cinematic: SummonCinematicState = initialSummonState();
+  // The snapshot the clean return re-applies on `done`. The cinematic CAPTURES the last BattleState
+  // the scene was given (already foldBattleState(timeline, cursor) truth) and RESTORES it via the SNAP
+  // path (applySnapshot) — it NEVER recomputes mechanics (R1: restore, don't recompute). [story Task 2]
+  private cinematicSnapshot: BattleState | null = null;
+
   constructor() {
     super('Arena');
   }
@@ -102,6 +123,11 @@ export class ArenaScene extends Phaser.Scene {
   // the immutable snapshot and UPDATE the existing display objects/bars/gauge in place. Never throws
   // on a well-formed snapshot; never recreates objects. [story Task 4]
   applySnapshot(snapshot: BattleState): void {
+    // Capture the latest snapshot the scene was given — it is the reducer's foldBattleState truth for
+    // the current cursor. The cinematic's clean return RE-APPLIES this on `done` (R1: restore, not
+    // recompute). The boot calls applySnapshot (via adapter.render) for t=0 + every seek/scrub, so by
+    // the time a summon intent arms the cinematic this holds the correct BattleState. [story Task 2]
+    this.cinematicSnapshot = snapshot;
     const model = toRenderModel(snapshot);
     for (const entity of model.entities) {
       const sceneEntity = this.entities.get(entity.id);
@@ -138,9 +164,112 @@ export class ArenaScene extends Phaser.Scene {
   // intent list; an unknown behavior/target is a safe no-op (fail-closed, exactly runIntent's posture).
   // [story Task 3 "PLACEHOLDER on the existing cast"]
   playBeatBehaviors(intents: BeatBehaviorIntent[]): void {
+    // The THUNDORR cinematic ELEVATION (Story 3.4): a `summon` behavior intent STARTS the full-scene
+    // cinematic instead of the placeholder flash. The trigger is summon-SPECIFIC — a behavior list
+    // without a summon intent (a Dispel/Shaman sequence) leaves the cinematic at rest. The cinematic
+    // rides the EXISTING renderBeatBehaviors seam (NO new RenderPort method). [story Task 3]
+    const hasSummon = intents.some((i) => i.target === 'eidolon' && i.behavior === 'summon');
+    if (hasSummon) {
+      this.startCinematic();
+    }
     for (const intent of intents) {
+      // When the cinematic is armed, its summon/decisive-blow intents are SUBSUMED by the set-piece
+      // (the cutaway overlay + the boss-stand-in blow own those visuals — decisive-blow maps to the
+      // `blow` phase), so skip them; any other intents in the list still run their placeholder cues.
+      const subsumed = hasSummon && intent.target === 'eidolon' && (intent.behavior === 'summon' || intent.behavior === 'decisive-blow');
+      if (subsumed) continue;
       this.runBehavior(intent);
     }
+  }
+
+  // ---- the THUNDORR-summon cinematic runner (Story 3.4): a DRIVEN set-piece, not a Phaser Timeline ----
+
+  // Arm + enter the cinematic (the first active phase, cutaway) and play the cutaway set-piece. The
+  // phase ADVANCES off the render-side cadence (the scene's update() ticks advanceSummon each frame)
+  // OR a synchronous advanceCinematicToDone() — NOT a tween onComplete (jsdom never fires it, so the
+  // smoke could not reach `done`). FAIL-CLOSED: the overlay/flash helpers no-op on a missing display.
+  private startCinematic(): void {
+    this.cinematic = startSummon();
+    this.playPhaseVisual(this.cinematic.phase);
+  }
+
+  // Phaser's per-frame hook (render-side wall-clock — the same cadence the rAF boot loop owns). While
+  // the cinematic is active, advance the pure machine by the frame delta and, on a phase CHANGE, play
+  // that phase's visual; on reaching `done`, fire the clean return. jsdom does not call update()
+  // (no real game loop), so the smoke drives the sequence via advanceCinematicToDone() instead — both
+  // paths reach the SAME terminal + clean-return snap. [story Task 3 "drive the phase from the cadence"]
+  override update(_time: number, deltaMs: number): void {
+    void _time; // Phaser's update(time, delta) hook; we advance off `delta` only (codebase convention)
+    if (!this.isCinematicActive()) return;
+    const before = this.cinematic.phase;
+    this.cinematic = advanceSummon(this.cinematic, deltaMs);
+    if (this.cinematic.phase !== before) this.playPhaseVisual(this.cinematic.phase);
+  }
+
+  // Drive the cinematic straight to `done` synchronously (the headless smoke's hook — jsdom advances
+  // no tweens/timers, so the gate reaches the terminal + the clean-return snap this way). A single
+  // total-span delta clamps the pure machine to `done`; playPhaseVisual fires the clean return.
+  // A no-op if the cinematic is not active. Never throws (fail-closed).
+  advanceCinematicToDone(): void {
+    if (!this.isCinematicActive()) return;
+    this.cinematic = advanceSummon(this.cinematic, SUMMON_CINEMATIC_TOTAL_MS);
+    this.playPhaseVisual(this.cinematic.phase);
+  }
+
+  // The current cinematic phase — the smoke reads this (mirroring lastPlayedIntents()) to assert the
+  // cinematic armed + reached `done` without inspecting pixels.
+  cinematicPhase(): SummonCinematicPhase {
+    return this.cinematic.phase;
+  }
+
+  // True while the cinematic is mid-play (a non-resting, non-terminal phase). The boot's
+  // advanceIfPlaying reads the analogous flag to SUSPEND the forward tick during the cutaway.
+  isCinematicActive(): boolean {
+    return this.cinematic.phase !== 'idle' && this.cinematic.phase !== 'done';
+  }
+
+  // Play the placeholder set-piece for a phase. PLACEHOLDER art (real THUNDORR art is Story 5.3's
+  // manifest swap): cutaway = a full-screen freeze overlay (the environmentOverlay precedent); blow =
+  // a large flash + lunge on the boss stand-in (the decisive blow); depart = a fade-out (the colossus
+  // leaves); done = the CLEAN RETURN — re-apply the captured snapshot via the SNAP path (restore, not
+  // recompute, R1) so the arena shows the correct BattleState for the cursor. FAIL-CLOSED throughout.
+  private playPhaseVisual(phase: SummonCinematicPhase): void {
+    switch (phase) {
+      case 'cutaway':
+        this.environmentOverlay(CUTAWAY_MS);
+        return;
+      case 'blow':
+        this.flash('boss', BLOW_MS);
+        this.lunge('boss', BLOW_MS, 1);
+        return;
+      case 'depart':
+        this.fadeOut('boss', DEPART_MS);
+        return;
+      case 'done':
+        // CLEAN RETURN: the `depart` phase faded the boss stand-in to alpha 0 (a no-yoyo fade — "it
+        // leaves"), and applySnapshot only restores position/bars, never alpha — so without this the
+        // stand-in would be left INVISIBLE after the cinematic (review F3). Kill the lingering fade and
+        // reset alpha to the resting 1 BEFORE re-applying the snapshot, so the arena returns cleanly to
+        // the visible arena state. Fail-closed: a no-op on a missing display. [review F3]
+        this.resetCinematicAlpha('boss');
+        // restore the captured reducer snapshot (foldBattleState truth) — never recompute (R1).
+        if (this.cinematicSnapshot) this.applySnapshot(this.cinematicSnapshot);
+        return;
+      default:
+        return;
+    }
+  }
+
+  // Reset the cinematic's faded stand-in to the resting alpha on the clean return (review F3). The
+  // `depart` fadeOut tweens alpha->0 with no yoyo, so on `done` we must KILL that still-running tween
+  // (else it keeps driving alpha back to 0 after we restore) and set alpha to 1. Guarded for the
+  // headless env (tweens?.killTweensOf is absent in some jsdom shapes) and a missing display — a safe
+  // no-op, never throws (the fail-closed runner posture). [review F3]
+  private resetCinematicAlpha(target: AnimationIntent['target']): void {
+    const display = this.displayOf(target);
+    if (!display) return;
+    this.tweens?.killTweensOf?.(display);
+    display.alpha = 1;
   }
 
   // ---- smoke-test introspection (no pixels) — let the headless boot assert the cast/bars/gauge ----
@@ -167,6 +296,13 @@ export class ArenaScene extends Phaser.Scene {
   bossBarFraction(): number {
     const boss = [...this.entities.values()].find((e) => e.kind === 'boss');
     return boss?.bar ? boss.bar.fraction : 0;
+  }
+
+  // The Boss stand-in's live alpha — the smoke asserts the cinematic clean return RESTORES it to 1 after
+  // the `depart` fade drove it to 0 (jsdom advances no tweens, so the test forces alpha 0 first). [F3]
+  bossAlpha(): number {
+    const display = this.displayOf('boss');
+    return display?.alpha ?? 1;
   }
 
   // The tracked fraction of an arbitrary bar/gauge target — lets the smoke assert tweenBar SEEDED the

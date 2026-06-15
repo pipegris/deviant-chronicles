@@ -68,6 +68,17 @@ export type ArenaHandle = {
   dispatch: (action: PlaybackAction) => void;
   advanceIfPlaying: () => void;
   getState: () => PlaybackState;
+  // Story 3.4: the DEV-ONLY preview hook (the testable surface) — plays the THUNDORR cinematic on
+  // demand over the CURRENT state.battleState snapshot and clean-returns to it via the SNAP path. The
+  // committed FixtureInterpreter omits `summon` by design, so the PRODUCTION trigger never fires in the
+  // dev fixture; this lets the operator WATCH the cinematic now WITHOUT injecting a fake summon into the
+  // production overlay. main.ts calls it behind import.meta.env.DEV (?cinematic=summon) — tree-shaken
+  // from the prod build. [story Task 3]
+  previewSummonCinematic: () => void;
+  // True while the cinematic plays — render-side TRANSIENT state (the rafId precedent), NOT playback
+  // state (never serialized, never in the reducer). advanceIfPlaying reads it to SUSPEND the forward
+  // tick mid-cutaway (Task 2 option A: paused-in-place, so resume is trivially clean). [story Task 2]
+  isCinematicActive: () => boolean;
   destroy: () => void;
 };
 
@@ -99,6 +110,22 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
   adapter.init();
   adapter.render(state.battleState); // show t=0 (a SNAP)
 
+  // Story 3.4 — the boot-owned cinematic-active flag. Render-side TRANSIENT state (the rafId
+  // precedent): true while the THUNDORR cinematic plays, false at rest. NOT playback state — it never
+  // serializes and never touches the reducer (one-way, R5/AC1). advanceIfPlaying suspends the forward
+  // tick while this is true (Task 2 option A) so no new transition starts mid-cutaway; the reducer
+  // state (cursor/status) never moves, so resume is trivially clean. [story Task 2]
+  //
+  // The SCENE's cinematic machine is the single source of truth (review F1/F2): the flag is the boot's
+  // cached mirror of adapter.isCinematicActive(). It is SET when the scene arms a cinematic (the dev
+  // hook, or a real summon intent on the forward tick) and CLEARED on the held-frame tick once the
+  // scene reports rest (the cutaway reached `done`) — so playback resumes. sceneCinematicActive()
+  // reads the adapter when it reports (the real Phaser path) and falls back to the cached flag for a
+  // pre-3.4 fake that does not. [review F1/F2]
+  let cinematicActive = false;
+  const sceneCinematicActive = (): boolean => adapter.isCinematicActive?.() ?? cinematicActive;
+  const isCinematicActive = (): boolean => cinematicActive;
+
   // The dispatch seam the controls hold: reduce the action into the live `state`, render cursor-JUMPS
   // via the SNAP path (you cannot tween across a jump), then reflect the new status/cursor/speed into
   // the UI. play/pause/setSpeed do not move the cursor, so they need no re-render — only a sync. The
@@ -111,12 +138,47 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     controls.sync();
   };
 
+  // Story 3.4 — the DEV-ONLY preview hook. Plays the THUNDORR cinematic on demand over the CURRENT
+  // state.battleState snapshot so the operator can WATCH it now (the committed FixtureInterpreter omits
+  // `summon`, so the PRODUCTION trigger never fires in the dev fixture). It (1) marks the cinematic
+  // active (the advanceIfPlaying guard then suspends the forward tick), (2) re-applies the CURRENT
+  // snapshot via the SNAP path (the clean return baseline — RESTORE the reducer's foldBattleState
+  // truth, never recompute, R1; restoring the current snapshot is a visual no-op but pins the
+  // clean-return contract), and (3) drives the real scene's cinematic via the optional one-way
+  // previewSummonCinematic command (a no-op on a fake adapter). It does NOT inject a `summon` into the
+  // production overlay — the FixtureInterpreter stays dispel+shaman; the cinematic is played DIRECTLY.
+  // [story Task 3; story Dev Notes §"Dev-only preview trigger"]
+  const previewSummonCinematic = (): void => {
+    cinematicActive = true;
+    adapter.render(state.battleState); // clean-return baseline: restore the reducer's snapshot (R1)
+    adapter.previewSummonCinematic?.(state.battleState);
+  };
+
   // One loop step, gated on status: advance the cursor by `state.speed` and ANIMATE the transition
   // ONLY while playing. The beatsAdvanced slice spans prev.cursor..next.cursor, so it is multi-beat-
   // safe — a speed>=2 tick animates a fused multi-beat transition with no special-casing. Paused (or
   // at the end, where tick is a clamped no-op) advances nothing and renders nothing.
   const advanceIfPlaying = (): void => {
     if (state.status !== 'playing') return;
+    // Story 3.4 — suspend the forward tick while the full-scene cinematic plays (Task 2 option A): no
+    // new reducer transition starts mid-cutaway, so the reducer state stays UNTOUCHED (paused-in-place)
+    // and resume needs no recompute. We still RE-RENDER the held frame's behaviors over the unchanged
+    // state (a held-frame command, beatsAdvanced=[]) so the read-only overlay keeps flowing to the
+    // scene — the cinematic owns only render-side wall-clock, never the reducer. [story Task 2]
+    //
+    // Resume (review F1): the scene's cinematic machine reaches `done` on its own cadence (Scene.update
+    // each frame / advanceCinematicToDone), so each held-frame tick we POLL it and clear the boot flag
+    // once it returns to rest — then fall through to the normal forward tick. Without this the flag was
+    // set-once and never cleared, permanently suspending playback after the dev preview (the only
+    // reachable cinematic path). [review F1]
+    if (cinematicActive) {
+      if (!sceneCinematicActive()) {
+        cinematicActive = false; // the scene returned to rest — resume the forward tick this same step
+      } else {
+        adapter.renderBeatBehaviors?.(state.battleState, state.battleState, [], view);
+        return;
+      }
+    }
     const prev = state.battleState;
     const prevCursor = state.cursor;
     state = reducer(state, { type: 'tick' });
@@ -131,6 +193,12 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     // forward tick drives this; seek/restart SNAP (you cannot dramatize across a jump) and never reach
     // here. [story Task 3 "hand the resulting intents to playBeatBehaviors; signals to a boot-owned sink"]
     adapter.renderBeatBehaviors?.(prev, state.battleState, beatsAdvanced, view);
+    // A real summon intent in this transition ARMS the scene's cinematic (arena-scene.playBeatBehaviors
+    // starts it). Reflect that into the boot flag so the NEXT tick suspends the forward advance (Task 2
+    // option A) for the production path too — without this the reducer would keep ticking "behind" the
+    // cutaway (the latent production-path bug). The dev hook arms the flag directly; this covers the
+    // real trigger. [review F2]
+    if (sceneCinematicActive()) cinematicActive = true;
     const { signals } = planBeatBehaviors(prev, state.battleState, beatsAdvanced, view);
     for (const signal of signals) onSignal(signal);
     controls.sync();
@@ -180,5 +248,14 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     adapter.destroy();
   };
 
-  return { adapter, controls, dispatch, advanceIfPlaying, getState: () => state, destroy };
+  return {
+    adapter,
+    controls,
+    dispatch,
+    advanceIfPlaying,
+    getState: () => state,
+    previewSummonCinematic,
+    isCinematicActive,
+    destroy,
+  };
 }
