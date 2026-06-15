@@ -1,0 +1,35 @@
+{
+  "$schemaVersion": 1,
+  "beats": {
+    "shaman": {
+      "fantasy": "The Fallen Shaman keeps reviving its imps — every imp you cut down rises again moments later.",
+      "real": "Recurring test failures from ONE root cause: fix a symptom and they come back; kill the root and the whole class dies at once."
+    },
+    "dispel": {
+      "fantasy": "The hero dispels a mirage — a conjured illusion shatters to reveal the true terrain beneath.",
+      "real": "The agent assumed something, then read the code to CHECK, and dropped the wrong assumption. Verifying beats guessing."
+    },
+    "summon": {
+      "fantasy": "The hero summons the Eidolon THUNDORR for one decisive blow.",
+      "real": "Spawning a sub-agent (the Task tool) to land the breakthrough fix after a long struggle."
+    }
+  },
+  "actions": {
+    "melee": {
+      "fantasy": "A hammer strike — a forge blow that chips the enemy's armor.",
+      "real": "A code edit (the Edit/Write tools) that chips away at the problem's integrity."
+    },
+    "spell": {
+      "fantasy": "A channeled spell, drawn out then released.",
+      "real": "Running the tests/build/lint (pnpm test/build/lint) — it opens the decisive strike."
+    },
+    "scout": {
+      "fantasy": "Scouting the terrain before the advance.",
+      "real": "Reading the code (the Read/Grep/Glob tools) to check the ground before acting."
+    },
+    "aetherStorm": {
+      "fantasy": "An Aether Storm rolls in — the party waits out the storm, then presses on.",
+      "real": "An environmental pause (a rate limit / 529 / backoff), NOT the hero's failure."
+    }
+  }
+}

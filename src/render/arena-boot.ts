@@ -12,9 +12,12 @@ import type { RenderPort } from './render-port';
 import { PhaserRenderAdapter } from './phaser/phaser-render-adapter';
 import { createControls } from './controls';
 import type { PlaybackControls } from './controls';
+import { createLegendOverlay } from './legend-overlay';
+import type { LegendGrounding, LegendOverlay } from './legend-overlay';
 import { fixtureAnnotations } from '../interpret/fixture-interpreter';
 import { applyOverlay } from '../interpret/overlay';
 import type { AnnotatedView } from '../interpret/overlay';
+import { getLegendEntries, resolveGrounding, LEGEND_BEATS } from '../portal/portal';
 import { planBeatBehaviors } from './beat-behavior';
 import type { BeatSignal } from '../interpret/beat-signal';
 import { planCaptions, planCaptionCorrection } from '../scribe/captions';
@@ -105,6 +108,13 @@ export type ArenaHandle = {
   // state (never serialized, never in the reducer). advanceIfPlaying reads it to SUSPEND the forward
   // tick mid-cutaway (Task 2 option A: paused-in-place, so resume is trivially clean). [story Task 2]
   isCinematicActive: () => boolean;
+  // Story 4.4 — the ON-DEMAND Legend / transparency portal (FR-11, UJ-2): a thin handle to drive the
+  // viewer-opened fantasy<->real overlay. CRITICAL (Dev Notes #5): open/close/toggle mutate ONLY the
+  // overlay's OWN visibility — they hold NO dispatch edge to the reducer, NEVER pause/seek/restart,
+  // NEVER set cinematicActive. So driving them leaves the PlaybackState (cursor/status/speed) AND the
+  // BattleState untouched and the status-gated rAF loop ticking unchanged — the non-interruption gate
+  // (arena-boot-legend.test.ts) pins this. The overlay is OUTSIDE the playback data path entirely.
+  legend: { open: () => void; close: () => void; toggle: () => void; isOpen: () => boolean };
   destroy: () => void;
 };
 
@@ -333,6 +343,45 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     speeds: [1, 2],
   });
 
+  // Story 4.4 — the active-beat GROUNDING accessor for the Legend overlay. PURE + READ-ONLY: it reads
+  // the live cursor + the frozen read-only `view` and resolves (via portal.resolveGrounding) the real
+  // Layer-0 event(s) the CURRENT active beat dramatizes (fantasy -> real, AC2). "Active beat" = the
+  // grounded signature annotation the cursor has most-recently reached: for each LEGEND_BEATS type with
+  // an annotation in the overlay, find the beat index whose sourceEventIds carries its anchor eventRef
+  // (the same L1->L0 bridge the behaviors/teaching use), keep those at/before the cursor, and pick the
+  // latest. Returns null when no grounded beat has been reached yet (or for summon, omitted from the
+  // committed fixture). It pushes NOTHING upstream — the overlay only DISPLAYS what it returns. [Task 4]
+  const beatIndexOfAnchor = (anchorEventRef: string): number =>
+    timeline.beats.findIndex((b) => b.sourceEventIds.includes(anchorEventRef));
+  const getActiveGrounding = (): LegendGrounding | null => {
+    let best: { beatKey: string; cursorIndex: number; eventIds: readonly string[] } | null = null;
+    for (const beatType of LEGEND_BEATS) {
+      const annotation = view.annotations.find((a) => a.beatType === beatType);
+      if (!annotation) continue;
+      const idx = beatIndexOfAnchor(annotation.eventRef);
+      if (idx < 0 || idx >= state.cursor) continue; // not reached yet (cursor is the NEXT beat to play)
+      if (!best || idx > best.cursorIndex) {
+        best = {
+          beatKey: beatType,
+          cursorIndex: idx,
+          eventIds: resolveGrounding(annotation, view).map((e) => e.eventId),
+        };
+      }
+    }
+    return best ? { beatKey: best.beatKey, eventIds: best.eventIds } : null;
+  };
+
+  // Mount the Legend overlay ADDITIVELY alongside the controls (the createControls precedent), handing
+  // it the PURE getLegendEntries() content feed + the read-only grounding accessor. The overlay is the
+  // on-demand transparency portal's DISPLAY; the boot OWNS its lifecycle (created here, torn down in
+  // destroy()). It is OUTSIDE the playback data path — it dispatches nothing, so the rAF loop is
+  // unaffected by open/close (Dev Notes #5). [story Task 4]
+  const legendOverlay: LegendOverlay = createLegendOverlay({
+    parent: mountHost,
+    entries: getLegendEntries(),
+    getActiveGrounding,
+  });
+
   // Wall-clock drive (render-side, NOT Layer-0): a fixed ~4 steps/sec cadence calls advanceIfPlaying,
   // which is itself the status gate. The loop keeps re-scheduling so a PAUSED arena resumes instantly
   // on PLAY (the callback runs but advances nothing while paused). We CAPTURE the rafId on every
@@ -362,6 +411,7 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
       rafId = null;
     }
     controls.destroy();
+    legendOverlay.destroy(); // Story 4.4: tear down the Legend overlay alongside controls (no leaked overlay on re-boot)
     adapter.destroy();
   };
 
@@ -375,6 +425,14 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     previewShamanCinematic,
     previewDispelCinematic,
     isCinematicActive,
+    // Story 4.4 — the thin Legend handle: drive open/close/toggle/isOpen from a test (and main.ts). The
+    // overlay holds no dispatch edge, so these never touch the reducer/cursor/BattleState (Dev Notes #5).
+    legend: {
+      open: () => legendOverlay.open(),
+      close: () => legendOverlay.close(),
+      toggle: () => legendOverlay.toggle(),
+      isOpen: () => legendOverlay.isOpen(),
+    },
     destroy,
   };
 }

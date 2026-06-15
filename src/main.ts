@@ -40,4 +40,15 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (cinematic === 'shaman') handle.previewShamanCinematic();
     else if (cinematic === 'dispel') handle.previewDispelCinematic();
   }
+
+  // The ON-DEMAND Legend / transparency portal (Story 4.4, FR-11, UJ-2). The always-visible toggle
+  // button the boot mounts IS the production affordance ("open the Legend") — it ships and works in
+  // prod with no flag. The DEV-ONLY ?legend flag merely AUTO-opens the panel during `pnpm dev` so the
+  // operator can verify its layout/legibility mid-playback without a click. GUARDED by import.meta.env
+  // .DEV: Vite statically replaces it with `false` in `build`, so this branch dead-code-eliminates from
+  // the production bundle (the ?cinematic= / ?saga DCE-preview precedent). Opening the Legend does NOT
+  // mutate the reducer/cursor/BattleState (the overlay holds no dispatch edge — Dev Notes #5). [Task 5]
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('legend') !== null) {
+    handle.legend.open();
+  }
 });

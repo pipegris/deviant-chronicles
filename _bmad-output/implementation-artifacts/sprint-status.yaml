@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T09:00:00Z
+last_updated: 2026-06-15T11:00:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -402,7 +402,7 @@ development_status:
   # matching the Epic-1/Epic-2 flip-post-senior-review precedent now that the H1 blocker is fixed).
   3-5: done
   # Epic 4 — The Telling & The Teaching (Layer 2 — Told + Portal)
-  epic-4: in-progress
+  epic-4: done
   # 4-1 moved backlog -> ready-for-dev (create-story). First Layer-2 (Told) story (FR-9): live templated Captions in src/scribe/captions.ts (config-as-data table keyed by ActionType + signature beats, Tolkien register, NO LLM/network) with deterministic occurrence-index variant rotation, the Dispel self-correction op (consuming the Story 3.3 scribe-correction BeatSignal via the reserved arena-boot onSignal sink to cross out + rewrite a prior caption), and the SM-C2 significant-only throttle. scribe/ reads only frozen L1 (AnnotatedView overlay) + L0, writes no mechanics (R1), stays SDK-free/phaser-free. Gate-verifiable: selection/rotation/correction-targeting/throttle/R1-R4 discipline. Operator-verified: on-screen caption legibility + the strikethrough->rewrite animation. epic-4 stays in-progress.
   # 4-1 moved ready-for-dev -> in-progress -> review (dev-story). First Layer-2 (Told) story (FR-9): live templated Captions. ADDED src/scribe/captions.ts (pure planCaptions emit selector + signature-beat L1->L0 override + SM-C2 idle-skip throttle + deterministic POSITIONAL variant rotation [Option B — the ATDD planCaptions harness threads no history; rotation derived from the beat's anchor index in view.events, no Math.random] + planCaptionCorrection [grounding-driven Dispel self-correction, not recency]), src/scribe/captions-config.ts (Zod-.strict() exhaustive caption-table loader, config-as-data), src/config/captions.json (Tolkien-register, 2+ variants/key: 7 ActionTypes + dispel/shaman). Wired the render seam additively (RenderPort.renderCaptions? one-way command; arena-boot onSignal drives the correction + threads planCaptions on the forward tick with a boot-owned caption history; phaser-render-adapter + arena-scene draw a caption band + strikethrough->rewrite). Gate-PROVEN (Vitest): AC1 selection+rotation+SM-C2, AC2 correction-targeting (real fixture dispel@u-0002#1 + a hand-built N-beats-back unit), R1/R4/R5 discipline (scribe/ SDK-free+phaser-free source-grep, no mechanics write, render->scribe type-only). Operator-verified: on-screen caption legibility + the strikethrough->rewrite animation feel (jsdom advances no Phaser tweens). Gates: typecheck/lint clean (R1/R4/R5 zones UNCHANGED), 68 files / 691 tests (was 65/670; +3 scribe suites/+21), build OK, no anthropic in dist (scribe/ is browser-reachable but stayed SDK-free; the caption table IS bundled — templated, no network), both golden snapshots byte-stable. Minor documented deviations: z.object().strict() over z.record (louder missing-key fail); CaptionOp.emit carries an extra groundingRefs provenance field (NOT a mechanics field) for correction targeting. NOT git-committed (operator commits between stories). epic-4 stays in-progress.
   # 4-1 review -> done (senior-review fix round 1, 2026-06-15). Review APPROVED both ACs (gate-half); 3 med + 5 low findings, all addressed/refuted, no high. F2 (the only behavioral fix, med): planCaptionCorrection now intersects the ASSUMPTION PORTION of the Dispel grounding (the grounding MINUS its trailing ground-truth-Read ref — the Dispel grounding is ordered "[...assumption events, ground-truth Read]" per epics.md L383/prd.md L145) instead of the full grounding, removing the latent mis-target where a richer session's SEPARATE later ground-truth-Read caption would be struck instead of the assumption; Beat[0] still intersects {u-0002#1,u-0002#2} so the AC2 gate stays green. Pinned by a new captions.unit.test.ts guard verified RED-without-fix (strikes the later Read caption) then GREEN. F5 (consider): NEW src/render/arena-boot-caption.test.ts pins the load-bearing emit-BEFORE-signal boot ordering (every emit precedes the single correct op; the correction targets a real prior emit) + the seek/restart/paused SNAP-no-caption posture — verified RED when the boot is reordered to route signals before planCaptions. F3 (consider): the occurrenceIndex rotation comment softened to the HONEST adjacency-only scope (the false "consecutive integers never congruent mod N" general claim removed) + a guard test pins the KNOWN non-adjacent collision (breakthrough melee Beat[9] == Beat[2] byte-identical, 8 beats apart -> AC1 holds); Dev Notes Option A (a true per-family counter) deferred — incompatible with the committed ATDD harness (threads no history into the selector). F1 (consider, med, DEFERRED): documented the thin-fixture limitation in captions.ts (the FixtureInterpreter FUSES the assumption + ground-truth Read into one dispel-tagged Beat[0], so the cross-out rewrites a correct dispel line with a synonym, not a mistaken assumption — narrative correctness needs the rich fixture/interpreter, Epic 5); the naive exclude-dispel-emit fix was NOT applied (yields null -> breaks the green AC2 gate), exactly as the synthesizer directed. F4 (doc counts 691/68/+21 -> 698/68/+28 at review time, 705/69 post-fix-round). F6 (doc: idle is a never-displayed schema-completeness placeholder — documented in captions-config.ts, not the JSON: a // comment is JSON.parse-rejected and the table is .strict()). F7 (doc: the renderCaptions N-back band-desync operator-verified visual edge + deferred overlay fix path). F8 + the __probe.test.ts residue REFUTED (no idle annotation exists so the ordering is unreachable; no probe/zz file under src/). Gates re-GREEN: typecheck/lint clean (R1/R4/R5 zones UNCHANGED, eslint.config.ts UNTOUCHED), 705 tests / 69 files (was 698/68: +1 file arena-boot-caption.test.ts/+5, +2 scribe guards), build OK, no anthropic in dist (scribe/ browser-reachable but SDK-free; caption table bundled — templated/no network), both golden snapshots (pace/+ingest/) byte-stable. NO git commit (operator commits between stories). epic-4 stays in-progress (4-1 is the first Epic-4 story, not the capstone).
@@ -417,4 +417,91 @@ development_status:
   # 4-3 moved in-progress -> review (dev-story). DONE the always-on signature-beat TEACHING (FR-11, SM-1), red-green against the 5 committed ATDD files (teaching.test/teaching.unit.test/r1-discipline/arena-boot-teaching/arena-teaching) + 1 added unit test, ZERO test edits (none encoded a wrong expectation). ADDED src/portal/teaching.ts (PURE planTeaching(prev,next,beatsAdvanced,view) -> TeachingOp[] — at most one plain-dev one-liner op per signature beatType firing, deduped by beatType for SM-C2; mirrors planCaptions/planBeatBehaviors; reuses the beat-behavior.ts L1->L0 bridge + isBreakthroughDischarge reading MODEL_TUNING.insight.dischargeThreshold, NO hardcode; carries the firing annotation's groundingPointer.eventRefs as the accuracy proof + a finite per-beatType dwellMs ~4000ms; PURE/deterministic/no-mutation; returns no BattleState, writes no mechanics field — R1 data-level), src/portal/teaching-config.ts (.strict() exhaustive Zod loader keyed by the 3 BeatType members, OneLinerSchema = z.string().min(1).max(TEACHING_MAX_LEN), TEACHING_MAX_LEN=140 the ONE SM-C2 brevity source of truth, validate-at-load fail-closed; mirrors captions-config.ts/model-tuning.ts), src/config/teaching.json (config-as-data, one FIXED plain-dev line per beat — shaman=root-cause, dispel=assumption-then-verify, summon=breakthrough-after-struggle; no rotation), src/portal/teaching-config.unit.test.ts (loader fail-closed: missing key/typo key/over-len/empty/bumped-version each throw). WIRED the display additively: RenderPort.renderTeaching?(ops) one-way OPTIONAL command (TeachingOp type-only; the renderCaptions?/renderSaga? precedent) + PhaserRenderAdapter.renderTeaching forwarding ready-guarded to the scene + ArenaScene.renderTeaching (create-once teachingText BOTTOM band at y~700, distinct from the y~40 caption band; sets+shows text, arms this.time.delayedCall(dwellMs, hide) auto-dismiss, a new op cancels/replaces the pending one; fail-closed never-throws) + arena-boot threading planTeaching + adapter.renderTeaching?.(...) on the FORWARD TICK ONLY (seek/restart/paused SNAP surface nothing; no new boot state — teaching is stateless per-transition). TRIGGER PARITY: dispel on the dispel-tagged Beat[0] (text===TEACHING.dispel, grounding ['u-0002#1','u-0002#2','u-0003#0']); shaman on the breakthrough-discharge death (text===TEACHING.shaman, grounding ['u-0009#0','u-0010#0']); summon UNIT-only (fixture omits it — the 3.3/3.4 honest gap; fires e2e with no code change once a summon-tagged annotation ships, Epic 5). REACHABILITY: dispel+shaman auto-surface live on the committed fixture (the 3.5 win — two of three beats). GATE-PROVEN: right one-liner per beat type; auto-surface on the beat with no viewer action (boot forward-tick, no toggle/open()); auto-dismiss encoded (finite dwellMs + scene timer); SM-C2 brevity (max-len bound + <=1 op/beat/transition); accuracy-to-event (grounding refs resolve, no dangling); R1/R4/R5 (SDK-free+phaser-free source-grep, no mechanics write, render->portal type-only). OPERATOR-VERIFIED (NOT gates — jsdom advances no Phaser timers/tweens): on-screen placement (non-overlapping band)/legibility/dwell timing FEEL. Gates: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts UNTOUCHED), 79 files / 788 tests (was 73/744 at HEAD 97ffc3f: +6 files [5 ATDD + 1 added teaching-config.unit.test] / +44 tests), build OK, grep -ril anthropic dist/ = NOTHING (teaching+config templated/SDK-free), both golden snapshots (pace/+ingest/) byte-stable (no Layer-0 code). Minor documented deviation: 1 unit test ADDED on top of the ATDD suite (teaching-config.unit.test.ts — the loader fail-closed guard, the model-tuning.unit.test.ts precedent). NOT the on-demand Legend/transparency portal overlay (Story 4.4). NOT git-committed (operator commits between stories). epic-4 stays in-progress (4-3 is not the Epic-4 capstone).
   # 4-3 review -> done (senior-review fix round 1, 2026-06-15). Review APPROVED both ACs (gate-half); 0 high / 0 med / 7 low. The only code change is F3 (consider, render-display): ArenaScene.renderTeaching now renders the LAST op (last-op-wins) instead of iterating every op, so a valid multi-op transition (dispel+summon co-fire — teaching.unit.test.ts) no longer flashes the earlier line ~0ms or churns the dismiss timer; exactly one delayedCall is armed for the surviving line's full dwell. Pinned by a new RED-then-GREEN regression in arena-teaching.test.ts (spies the Scene clock: 1 call, last op's dwell). Stacking distinct beatType lines stays deferred to Epic 5; unreachable on the committed fixture (dispel@Beat0 and shaman@discharge never share a transition). F1 (doc count 785->788 / +41->+44) + F2 (last_updated monotonic, re-bumped to 09:00:00Z) re-verified. F4 (shaman+summon co-fire on a dual-tagged breakthrough — intentional, mirrors planBeatBehaviors dual-emit, no AC needs precedence), F5 (shaman keys on isBreakthroughDischarge+hasShaman not anchor-this-transition — BY DESIGN per Dev Notes #3/AC1, lesson lands on the felt death; negative test teaching.test.ts:156-169), F6 (groundingRefs aliases the frozen readonly eventRefs — compile-time readonly blocks mutation, render reads only text/dwellMs, mirrors beat-behavior.ts), F7 (transient __probe__.test.ts already removed — absent from the tree) all independently re-verified and REFUTED (no code change). Gates re-GREEN: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts UNTOUCHED), 79 files / 789 tests (was 788; +1 F3 regression), build OK, grep -ril anthropic dist/ = NOTHING, both golden snapshots (pace/+ingest/) byte-stable. NO git commit (operator commits between stories). epic-4 stays in-progress (4-3 is not the Epic-4 capstone).
   4-3: done
-  4-4: backlog
+  # 4-4 moved backlog -> ready-for-dev (create-story). The FINAL Epic-4 story (the capstone): the ON-DEMAND
+  # Legend / transparency portal (FR-11, UJ-2) — a viewer-OPENED fantasy<->real overlay grounded in the real
+  # events, distinct from the ALWAYS-ON teaching one-liners (4.3, done). ADDS src/portal/portal.ts (the PURE,
+  # phaser-free transparency core: LEGEND_BEATS/LEGEND_ACTIONS coverage domains + getLegendEntries() + the PURE
+  # resolveGrounding(annotation, view) that maps an active beat's groundingPointer.eventRefs to the REAL Layer-0
+  # NormalizedEvent(s) it dramatizes via the Story-3.1 read-only AnnotatedView — fantasy -> real, accurate to the
+  # real Event, FAIL-LOUD on a dangling ref [the frozen-overlay-invariant posture, the 3.1/3.2 no-dangling
+  # build-time guarantee]) + src/portal/legend-config.ts + src/config/legend.json (config-as-data, .strict() Zod
+  # loader mirroring teaching-config.ts; the 3 beats {shaman,dispel,summon} + the 4 CORE actions
+  # {melee=strike/edit, spell=spell/test, scout=scout/read, aetherStorm=Aether-Storm/rate-limit} authored
+  # ACCURATE to translation-rules.json; LEGEND_MAX_LEN brevity bound closes the rubric's unbounded-"concise"
+  # finding) + a THIN render overlay src/render/legend-overlay.ts (a DOM overlay, the controls.ts precedent —
+  # NO phaser, jsdom-testable; open/close/toggle/isOpen/destroy via one AbortController). OPEN/CLOSE WITHOUT
+  # INTERRUPTING PLAYBACK (the load-bearing decision): the overlay toggles ONLY its OWN visibility — it
+  # dispatches NO PlaybackAction, NEVER sets cinematicActive (the 3.4 suspend path WOULD interrupt — deliberately
+  # NOT reused), NEVER touches the reducer/cursor/BattleState; the status-gated rAF loop keeps ticking unchanged.
+  # Reuses the 2.2 reducer / 2.5 controls ONE-WAY posture (render reads, reducer owns state), NOT the cinematic
+  # guard. Wired additively into arena-boot (mount alongside createControls; `legend` on ArenaHandle; torn down
+  # in destroy()); main.ts mounts the toggle + optional ?legend DEV auto-open (the ?cinematic=/?saga DCE
+  # precedent). GATE-VERIFIABLE: Legend covers the 3 beats + 4 core actions; resolveGrounding maps to the CORRECT
+  # real eventIds end-to-end on the committed fixture (dispel@u-0002#1 + shaman@u-0010#0; summon unit-only — the
+  # 3.3/3.4 honest gap) + fail-loud on a fabricated dangling ref + determinism + no-input-mutation; open/close
+  # leaves PlaybackState (cursor/status/speed) AND BattleState DEEP-EQUAL (the non-interruption proof) + never
+  # dispatched + isCinematicActive stays false + the loop still advances while open; R1/R4/R5 (portal SDK-free +
+  # phaser-free source-grep [r1-discipline.test.ts extended with portal.ts + legend-config.ts], no mechanics
+  # write, render->portal type-only). OPERATOR-VERIFIED (NOT a gate — pnpm dev; jsdom advances no Phaser tweens /
+  # lays out no real pixels): the overlay layout / legibility / open-close FEEL. Gates: typecheck/lint clean
+  # (R1/R4/R5 hold, eslint.config.ts UNCHANGED), full suite green (baseline 79 files / ~814 cases at HEAD
+  # 6cfcdb5), BOTH golden snapshots (pace/+ingest/) byte-stable (no Layer-0 code), build OK + grep -ril anthropic
+  # dist/ = NOTHING (Legend is templated config-as-data, no LLM/network). NOTE: 4-4 is the Epic-4 CAPSTONE — per
+  # the explicit instruction, after 4-4 reaches done (dev-story -> review -> done) epic-4 ALSO flips
+  # in-progress -> done. create-story leaves 4-4 ready-for-dev + epic-4 in-progress. NO git commit (operator
+  # commits between stories). epic-4 stays in-progress.
+  # 4-4 moved ready-for-dev -> in-progress -> review (dev-story). The FINAL Epic-4 story (the capstone):
+  # the ON-DEMAND Legend / transparency portal (FR-11, UJ-2) — a viewer-OPENED fantasy<->real overlay
+  # grounded in the real events, distinct from the ALWAYS-ON teaching one-liners (4.3, done). Made the 5
+  # committed ATDD red files green HONESTLY (none deleted/skipped/weakened) + fixed 2 ATDD-scaffold
+  # lint/typecheck failures (genuinely-dead unused imports/helpers the red files copied verbatim but never
+  # referenced — pace/translate in portal.test, the full runIngest/timeline()/ingest chain in
+  # arena-boot-legend.test; each removal annotated in-file, no assertion weakened). ADDED src/portal/portal.ts
+  # (the PURE phaser-free core: LEGEND_BEATS/LEGEND_ACTIONS coverage domains + getLegendEntries() + the PURE
+  # resolveGrounding(annotation, view) mapping an active beat's groundingPointer.eventRefs to the REAL
+  # Layer-0 NormalizedEvent(s) via the 3.1 read-only AnnotatedView — fantasy -> real, accurate, FAIL-LOUD on
+  # a dangling ref [the frozen-overlay-invariant posture] + resolveActiveBeatGrounding helper), src/portal/
+  # legend-config.ts (.strict() exhaustive Zod loader, LEGEND_MAX_LEN=160 brevity bound, validate-at-load
+  # fail-closed; mirrors teaching-config.ts) + src/config/legend.json (config-as-data, the 3 beats + 4 CORE
+  # actions {melee=strike/edit, spell=spell/test, scout=scout/read, aetherStorm=Aether-Storm/rate-limit}
+  # authored ACCURATE to translation-rules.json), src/render/legend-overlay.ts (a THIN DOM overlay, the
+  # controls.ts precedent — NO phaser, jsdom-testable; open/close/toggle/isOpen/destroy via one
+  # AbortController). NON-INTERRUPTION (the load-bearing decision): the overlay toggles ONLY its OWN
+  # visibility — dispatches NO PlaybackAction, NEVER sets cinematicActive (the 3.4 suspend path WOULD
+  # interrupt — deliberately NOT reused), NEVER touches the reducer/cursor/BattleState; the status-gated rAF
+  # loop keeps ticking unchanged. Wired additively into arena-boot (mount alongside createControls; `legend`
+  # on ArenaHandle; torn down in destroy()); main.ts adds the always-visible toggle + DEV-only ?legend
+  # auto-open (DCE'd from prod, the ?cinematic=/?saga precedent). DISPLAY-SEAM DECISION: kept the ENTIRE
+  # Legend in the DOM overlay — did NOT add a RenderPort.renderLegendGrounding? Phaser command (no Phaser
+  # reveal required), so render-port.ts + the scene are UNTOUCHED. GATE-PROVEN (Vitest): AC1 coverage (3
+  # beats + 4 core actions), AC2 grounding (dispel -> u-0002#1/u-0002#2/u-0003#0 + shaman -> u-0009#0/u-0010#0
+  # end-to-end on the committed fixture, IN ORDER, same object identities; fabricated dangling ref throws;
+  # deterministic + no-input-mutation; summon symmetry unit-only — the 3.3/3.4 honest gap), AC1
+  # non-interruption (PlaybackState cursor/status/speed + BattleState DEEP-EQUAL across open->close, paused +
+  # mid-playing; no render command driven; isCinematicActive stays false; loop still advances while open),
+  # R1/R4/R5 (portal SDK-free + phaser-free source-grep; no mechanics write; render->portal type-only).
+  # OPERATOR-VERIFIED (NOT a gate — pnpm dev; jsdom advances no Phaser tweens / lays out no real pixels): the
+  # overlay layout / legibility / open-close FEEL. Gates: typecheck/lint clean (R1/R4/R5 hold,
+  # eslint.config.ts UNTOUCHED), 83 files / 842 tests (was 78 files/789 passing at the RED baseline; +5 ATDD
+  # files now green), build OK, grep -ril anthropic dist/ = NOTHING (Legend is templated config-as-data, no
+  # LLM/network; ?legend DEV flag DCE'd from prod), BOTH golden snapshots (pace/+ingest/) byte-stable (no
+  # Layer-0 code). NO git commit (operator commits between stories). NOTE: 4-4 is the Epic-4 CAPSTONE — per
+  # the project convention (dev-story flips to review, senior-review flips to done) the 4-4 -> done AND
+  # epic-4 in-progress -> done flips are the senior-review step (the story Dev Notes states epic-4 flips
+  # "after 4-4 reaches done (dev-story -> review -> done)"). epic-4 stays in-progress.
+  # 4-4 review -> done (senior-review fix round 1, 2026-06-15). Review APPROVE: 5 low-severity findings, no
+  # high/medium. LOW-001 (the only `fix`) confirmed already-applied + accurate — the GREEN doc count is
+  # 83 files / 842 cases (re-measured via pnpm test this round; the stale 833 in this comment block + the
+  # story Debug Log corrected to 842). LOW-002..005 REFUTED with independent verification (no source change —
+  # documented invariants / double-guarded): LOW-002 resolveActiveBeatGrounding is exported+unit-tested but
+  # has no prod caller and the boot's latest-reached-beat selection is deliberately commented (one annotation
+  # per beatType in the fixture, fail-loud unreachable under the frozen-overlay invariant); LOW-003 the
+  # readonly[] annotation does not type-enforce exhaustiveness (tsc probe: dropped member compiles, typo
+  # errors TS2820) but coverage is double-pinned by portal.test runtime asserts + the .strict() Zod schema;
+  # LOW-004 active-beat grounding is intentional open-time-snapshot semantics (operator-feel, no AC needs a
+  # live tracker); LOW-005 the dual LegendEntry is deliberate in-file-documented renderer<->portal decoupling
+  # (narrow->string assignable, structural compat at the boot seam). Gates re-run GREEN: typecheck 0, lint 0
+  # (R1/R4/R5 hold, eslint.config.ts UNTOUCHED), 83 files / 842 cases, build OK, grep -ril anthropic dist/
+  # empty, both golden snapshots byte-stable. NO git commit. epic-4 stays in-progress (the operator flips
+  # epic-4 -> done as the capstone, per the Epic-1/2/3 flip-post-senior-review precedent).
+  4-4: done

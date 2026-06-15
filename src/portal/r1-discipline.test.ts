@@ -20,8 +20,12 @@ import { describe, expect, it } from 'vitest';
 //        grep re-states it for the new module.
 const PORTAL = dirname(fileURLToPath(import.meta.url));
 
-// The browser-reachable teaching core — the modules that MUST stay SDK-free AND phaser-free.
-const PORTAL_MODULES = ['teaching.ts', 'teaching-config.ts'];
+// The browser-reachable portal core — the modules that MUST stay SDK-free AND phaser-free. Story 4.4
+// (RED) adds the on-demand Legend's `portal.ts` (the coverage + grounding-resolver core) and
+// `legend-config.ts` (the config-as-data loader) to this grep — they are NOT authored yet, so the
+// readFileSync below ERRORs on them now (the intended red) and turns green once the dev authors them
+// SDK-free + phaser-free. [story Task 2 "Extend r1-discipline.test.ts"; Dev Notes #8]
+const PORTAL_MODULES = ['teaching.ts', 'teaching-config.ts', 'portal.ts', 'legend-config.ts'];
 
 describe('Story 4.3 (R4) — portal/ teaching core imports no @anthropic-ai/sdk (templated, no LLM)', () => {
   for (const file of PORTAL_MODULES) {
@@ -51,6 +55,20 @@ describe('Story 4.3 (R1, data-level) — teaching.ts constructs no BattleState a
     // This grep is a coarse belt-and-suspenders companion to the runtime hasOwnProperty checks in
     // teaching.test.ts — a regression that started folding state would likely introduce one of these.
     const source = readFileSync(join(PORTAL, 'teaching.ts'), 'utf8');
+    for (const mech of ['problemIntegrity:', 'insightGauge:', 'enemies:']) {
+      expect(source).not.toContain(mech);
+    }
+  });
+});
+
+describe('Story 4.4 (R1, data-level) — portal.ts writes no mechanics field (the grounding resolver returns Layer-0 truth)', () => {
+  it('src/portal/portal.ts never assigns a Layer-0 mechanics field (problemIntegrity/insightGauge/enemies)', () => {
+    // The R1 data-level proof at the source level: resolveGrounding READS the read-only overlay and
+    // returns readonly NormalizedEvent[] — it constructs/returns NO BattleState/Beat and writes NO
+    // mechanics field onto its output. A regression that started folding state would likely introduce
+    // one of these assignments. Mirrors the teaching.ts no-mechanics block above. RED until portal.ts
+    // exists (this readFileSync ERRORs now). [story Task 2; Dev Notes #4 "the R1 data-level proof"]
+    const source = readFileSync(join(PORTAL, 'portal.ts'), 'utf8');
     for (const mech of ['problemIntegrity:', 'insightGauge:', 'enemies:']) {
       expect(source).not.toContain(mech);
     }
