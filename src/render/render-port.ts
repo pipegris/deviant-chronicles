@@ -1,5 +1,6 @@
 import type { BattleState, Beat } from '../schema/battle-timeline';
 import type { AnnotatedView } from '../interpret/overlay';
+import type { CaptionOp } from '../scribe/captions';
 
 // render-port — the ONE-WAY RenderPort interface (FR-7, R5): the swap seam. It imports BattleState
 // (and Beat) as a TYPE and imports NO phaser, so it is renderer-agnostic — swapping Phaser for
@@ -51,6 +52,16 @@ export interface RenderPort {
   // the boot hooks behind import.meta.env.DEV so these never run in production. [story Task 4]
   previewShamanCinematic?(snapshot: BattleState): void;
   previewDispelCinematic?(snapshot: BattleState): void;
+  // The CAPTION path (Story 4.1, FR-9): draw the Scribe's live templated captions for a transition —
+  // an `emit` op renders an in-register caption in the caption band; a `correct` op crosses out the
+  // prior caption it targets and rewrites it (the Dispel honesty beat). One-way like the other
+  // commands: it returns void and pushes NOTHING back upstream (the caption SELECTION/text is decided
+  // in Layer 2 scribe/captions.ts; this command only DISPLAYS it). `CaptionOp` is a TYPE-only import
+  // (render -> scribe is allowed — there is no lint zone forbidding it, and render/ already imports
+  // interpret/; no phaser leaks into scribe/). OPTIONAL (`?`) so the additive extension stays
+  // BACKWARD-COMPATIBLE (a pre-4.1 fake adapter still satisfies RenderPort; the boot guards the call),
+  // exactly the renderBeatBehaviors? precedent. [story Task 5; Dev Notes "Where CaptionOp lives"]
+  renderCaptions?(ops: CaptionOp[]): void;
   // The lone read-only QUERY on this otherwise one-way command interface (Story 3.4 fix F1/F2): is the
   // renderer's cinematic mid-play? The scene's cinematic machine is the single source of truth for when
   // the cutaway reaches `done`; the boot OBSERVES this to suspend/resume the forward tick (it pushes

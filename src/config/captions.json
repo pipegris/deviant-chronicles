@@ -1,0 +1,48 @@
+{
+  "$schemaVersion": 1,
+  "melee": [
+    "By hammer and hash, the Forgemaiden struck the Boss true.",
+    "Another forge-blow rang out, and the Boss reeled.",
+    "Steel met flaw; the Forgemaiden hammered on.",
+    "The anvil sang once more beneath her relentless strokes."
+  ],
+  "spell": [
+    "She channelled the proving-spell, and the runes held their breath.",
+    "A cast of testing-fire wreathed the work in light.",
+    "The Forgemaiden weaved a spell of trial upon the build."
+  ],
+  "scout": [
+    "She read the deep-glyphs, and the lay of the land grew plain.",
+    "A scouting-grep swept the halls; what was hidden showed itself.",
+    "The Forgemaiden peered into the archives and learned their secret."
+  ],
+  "counter": [
+    "The foe struck back, and her Resolve guttered like a windblown torch.",
+    "A counter-blow landed; the kingdom's heart faltered a moment.",
+    "The Boss answered in kind, and her spirit took the wound."
+  ],
+  "summon": [
+    "By hammer and hash, THUNDORR was called, and the air went taut.",
+    "She summoned the Eidolon, and a shadow of legend fell across the field.",
+    "An ally of old was bidden forth; the ground trembled at its coming."
+  ],
+  "aetherStorm": [
+    "An Aether-Storm rolled in, and the channeling-spells stood becalmed.",
+    "The skies churned with wild aether; the forge held its breath till it passed.",
+    "A tempest of the outer airs swept the arena, and all casting waited."
+  ],
+  "idle": [
+    "A quiet fell upon the forge.",
+    "The arena drew a slow, waiting breath."
+  ],
+  "dispel": [
+    "The Forgemaiden looked closer, and the Mirage broke; the truth stood plain.",
+    "She named the illusion for what it was, and the Scribe set the record straight.",
+    "The false vision shattered under a clear eye; what was true was told anew."
+  ],
+  "shaman": [
+    "The Fallen Shaman was unmasked as the root of all the haunting symptoms.",
+    "Beneath the recurring imps stood their maker; the root cause was laid bare.",
+    "She traced the curse to its source, and the Shaman of the deep was revealed."
+  ]
+}

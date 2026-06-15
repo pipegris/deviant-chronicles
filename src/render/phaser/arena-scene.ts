@@ -6,6 +6,7 @@ import type { BattleState } from '../../schema/battle-timeline';
 import type { EntityKind, RenderEntity } from '../render-model';
 import type { AnimationIntent } from '../animation-plan';
 import type { BeatBehaviorIntent } from '../beat-behavior';
+import type { CaptionOp } from '../../scribe/captions';
 import { toRenderModel } from '../render-model';
 import { initialBattleState } from '../../model/battle-model';
 import {
@@ -112,6 +113,21 @@ export class ArenaScene extends Phaser.Scene {
   // state — not modeled mechanics (NO per-imp HP; AC1 imps-are-presentation-only). [story Task 4]
   private impSwarm: Phaser.GameObjects.Rectangle[] = [];
 
+  // ---- the live caption band (Story 4.1, FR-9) ----
+  // The Scribe's narration band: ONE Text object near the top of the stage showing the LATEST caption
+  // (the caption SELECTION/text is decided in Layer 2 scribe/captions.ts; the scene only DISPLAYS it).
+  // A second Text holds the rewrite line during a Dispel correction, and a strikethrough Rectangle is
+  // drawn over the struck caption (the honesty beat). Render-side transient state — never serialized,
+  // never pushed upstream (R5/AC1). All null until create() builds them. [story Task 5]
+  private captionText: Phaser.GameObjects.Text | null = null;
+  private captionStrike: Phaser.GameObjects.Rectangle | null = null;
+  private captionRewrite: Phaser.GameObjects.Text | null = null;
+  // The text of the LATEST emitted caption (what the band currently shows) and the captionId->text map
+  // so a `correct` op can recover the struck text for the prior caption it targets even if it is not
+  // the one currently on the band. [story Task 5]
+  private currentCaptionText = '';
+  private readonly captionTextById = new Map<string, string>();
+
   constructor() {
     super('Arena');
   }
@@ -146,6 +162,20 @@ export class ArenaScene extends Phaser.Scene {
 
     // The Insight Gauge widget (scene-global): a labelled bar near the bottom-center of the stage.
     this.insightGauge = this.createGauge(initial.insightGauge);
+
+    // The caption band (Story 4.1): a centered Text near the top of the stage for the Scribe's live
+    // narration, an (initially hidden) rewrite Text just below it for the Dispel correction, and an
+    // (initially hidden) strikethrough Rectangle drawn over the struck caption. create-ONCE; their
+    // text/visibility mutate in place on renderCaptions. The `add.text` precedent is the gauge label
+    // (createGauge). [story Task 5]
+    this.captionText = this.add
+      .text(512, 40, '', { fontSize: '20px', color: '#f5e8c8', align: 'center', wordWrap: { width: 900 } })
+      .setOrigin(0.5, 0);
+    this.captionStrike = this.add.rectangle(512, 50, 0, 2, 0xff5555).setOrigin(0.5, 0.5).setVisible(false);
+    this.captionRewrite = this.add
+      .text(512, 78, '', { fontSize: '20px', color: '#ffd54f', align: 'center', wordWrap: { width: 900 } })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
   }
 
   // applySnapshot — the one-way command the adapter's render() forwards. Compute the RenderModel from
@@ -261,6 +291,50 @@ export class ArenaScene extends Phaser.Scene {
       return true;
     }
     return false;
+  }
+
+  // renderCaptions — the CAPTION path (Story 4.1, FR-9) the adapter's renderCaptions forwards (a sibling
+  // to playAnimations / playBeatBehaviors). For each op in order: an `emit` shows its in-register text on
+  // the caption band (and records it by id, clearing any prior correction overlay); a `correct` crosses
+  // out the targeted prior caption's text (a strikethrough rule sized to the struck text) and shows the
+  // rewrite line beneath it — the Dispel honesty beat, landing on the same transition as the shatter
+  // cinematic's record-scratch. With placeholder styling these are Text swaps + a Rectangle rule; the
+  // strikethrough -> rewrite ANIMATION feel is operator-verified (jsdom advances no tweens). Never throws
+  // on a well-formed op (fail-closed: a missing band / unresolved target is a safe no-op). [story Task 5]
+  renderCaptions(ops: CaptionOp[]): void {
+    for (const op of ops) {
+      if (op.kind === 'emit') {
+        this.currentCaptionText = op.text;
+        this.captionTextById.set(op.captionId, op.text);
+        this.captionText?.setText(op.text);
+        // A fresh emit clears any lingering correction overlay from a previous Dispel.
+        this.captionStrike?.setVisible(false);
+        this.captionRewrite?.setText('').setVisible(false);
+      } else {
+        // A `correct` op: cross out the struck text and show the rewrite. The struck text comes on the op
+        // (the prior caption's own text); fall back to the band's current text if absent (defensive).
+        //
+        // OPERATOR-VERIFIED VISUAL EDGE (review F7, NOT gate-caught): the cross-out rewrites the SINGLE
+        // shared caption band back to the struck text before striking it. On the committed fixture the
+        // Dispel emit + its correction share Beat[0]'s transition, so the band already shows the struck
+        // text and there is no visible snap. But on the N-back path (a correction whose target is several
+        // captions back — the scribe/captions.unit.test.ts case) the band currently shows a LATER caption,
+        // so this setText snaps it back to the older struck line then strikes it — a visual jump. jsdom
+        // advances no tweens, so this is operator-only. IF it reads wrong during `pnpm dev`, the fix is to
+        // render the strikethrough as an OVERLAY tied to the target caption's id/position rather than
+        // rewriting the shared band Text; deferred until the operator confirms (the real fixture masks it).
+        const struck = op.struckText || this.captionTextById.get(op.targetCaptionId) || this.currentCaptionText;
+        this.captionText?.setText(struck);
+        if (this.captionText && this.captionStrike) {
+          // Size the strikethrough rule to the struck caption's rendered width, centered on its line.
+          this.captionStrike.width = Math.max(0, this.captionText.width);
+          this.captionStrike.setPosition(this.captionText.x, this.captionText.y + this.captionText.height / 2);
+          this.captionStrike.setVisible(true);
+        }
+        this.captionRewrite?.setText(op.newText).setVisible(true);
+        this.currentCaptionText = op.newText;
+      }
+    }
   }
 
   // ---- the cinematic runners (Story 3.4 summon + Story 3.5 shaman/dispel): DRIVEN set-pieces ----

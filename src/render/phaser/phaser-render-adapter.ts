@@ -3,6 +3,7 @@
 import * as Phaser from 'phaser';
 import type { BattleState, Beat } from '../../schema/battle-timeline';
 import type { AnnotatedView } from '../../interpret/overlay';
+import type { CaptionOp } from '../../scribe/captions';
 import type { RenderPort } from '../render-port';
 import { planAnimations } from '../animation-plan';
 import { planBeatBehaviors } from '../beat-behavior';
@@ -178,6 +179,19 @@ export class PhaserRenderAdapter implements RenderPort {
     if (scene) {
       scene.playBeatBehaviors([{ target: 'mirage', behavior: 'shatter', durationMs: 0 }]);
     }
+  }
+
+  // The CAPTION command (Story 4.1, FR-9): draw the Scribe's caption ops on the live scene's caption
+  // band. Forwarded to ArenaScene.renderCaptions (an `emit` shows an in-register caption; a `correct`
+  // crosses out + rewrites the targeted prior caption — the Dispel honesty beat, coinciding with the
+  // shatter cinematic's record-scratch). The caption SELECTION/text was decided in Layer 2 (scribe/
+  // captions.ts); this only DISPLAYS it. A no-op if the scene is still booting (never throws). One-way
+  // — nothing flows back upstream (R5/AC1). [story Task 5]
+  renderCaptions(ops: CaptionOp[]): void {
+    const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) scene.renderCaptions(ops);
+    // else: still booting — captions are PRESENTATION; drop them (no upstream effect, the next snapshot
+    // is the truth). Never buffer stale narration that would play out of sync once boot finishes.
   }
 
   // The read-only cinematic QUERY (Story 3.4 fix F1/F2): false before boot. The boot polls this so the

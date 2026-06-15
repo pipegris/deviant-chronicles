@@ -17,6 +17,8 @@ import { applyOverlay } from '../interpret/overlay';
 import type { AnnotatedView } from '../interpret/overlay';
 import { planBeatBehaviors } from './beat-behavior';
 import type { BeatSignal } from '../interpret/beat-signal';
+import { planCaptions, planCaptionCorrection } from '../scribe/captions';
+import type { CaptionOp } from '../scribe/captions';
 
 // arena-boot — wires the Story 2.2 playback reducer to the RenderPort adapter AND the Story 2.5
 // on-screen CONTROLS. The boot OWNS the reducer state + adapter + controls (one-way: controls
@@ -110,10 +112,33 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
   // ONCE"; architecture.md#R4 L236-238]
   const view: AnnotatedView = applyOverlay(events, fixtureAnnotations());
 
-  // The boot-owned signal sink (Story 3.3): a no-op if no consumer is wired (this story); Story 4.1
-  // (FR-9) injects a collecting sink to drive the caption rewrite. The behavior plan's emitted signals
-  // are routed here, never back upstream (one-way, R5/AC1).
-  const onSignal = deps.onSignal ?? ((): void => {});
+  // The boot-owned signal sink (Story 3.3): a no-op if no consumer is wired. Story 4.1 (FR-9) now
+  // wires it: an injected sink (if any) still RECEIVES every signal (the Story-3.3 contract is
+  // preserved), and ADDITIONALLY the boot drives the caption rewrite from the scribe-correction signal
+  // (below). One-way: the sink only RECEIVES; nothing flows back upstream (R5/AC1).
+  const injectedSink = deps.onSignal ?? ((): void => {});
+
+  // Story 4.1 — the boot-owned caption HISTORY: the `emit` ops planCaptions has produced so far, in
+  // fold order. Render-side TRANSIENT state (the cinematicActive/rafId precedent) — never in the
+  // reducer, never serialized. The Dispel correction handler resolves its target against this running
+  // history (the assumption caption to cross out is a PRIOR emit). seek/restart SNAP and do NOT emit
+  // captions (you cannot narrate across a jump — same posture as the behavior path), so the history
+  // grows ONLY on the forward tick. [story Task 4]
+  const captionHistory: Extract<CaptionOp, { kind: 'emit' }>[] = [];
+
+  // onSignal — the boot's signal handler (Story 4.1). Forward every signal to the injected sink, THEN,
+  // for a scribe-correction signal (the Dispel honesty beat), resolve the `correct` op against the
+  // running caption history and hand it to the render adapter to draw the cross-out -> rewrite. The
+  // correction rides the SIGNAL path, distinct from the per-transition planCaptions EMIT path. A signal
+  // with no matching prior caption yields no op (planCaptionCorrection returns null) — nothing to draw.
+  // [story Task 3 "the signal handler CORRECTS", Task 4]
+  const onSignal = (signal: BeatSignal): void => {
+    injectedSink(signal);
+    if (signal.kind === 'scribe-correction') {
+      const correction = planCaptionCorrection(signal, captionHistory);
+      if (correction) adapter.renderCaptions?.([correction]);
+    }
+  };
 
   const adapter = deps.createAdapter ? deps.createAdapter(parent) : new PhaserRenderAdapter(parent);
   adapter.init();
@@ -227,6 +252,17 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     // cutaway (the latent production-path bug). The dev hook arms the flag directly; this covers the
     // real trigger. [review F2]
     if (sceneCinematicActive()) cinematicActive = true;
+    // The CAPTION path (Story 4.1, FR-9) rides the SAME forward transition: the PURE planCaptions emits
+    // one `emit` op per captionable advanced beat (idle skipped, SM-C2 throttle). Append them to the
+    // boot-owned history (so a later Dispel correction can target a prior caption) and hand them to the
+    // adapter to draw. This runs BEFORE routing the signals so the Dispel beat's OWN caption is in the
+    // history before the same transition's scribe-correction signal resolves its target (the assumption
+    // caption the Dispel crosses out is emitted on this very transition). Only the forward tick drives
+    // this; seek/restart SNAP (no narration across a jump) and never reach here. [story Task 4]
+    const captionOps = planCaptions(prev, state.battleState, beatsAdvanced, view);
+    const emits = captionOps.filter((o): o is Extract<CaptionOp, { kind: 'emit' }> => o.kind === 'emit');
+    captionHistory.push(...emits);
+    if (captionOps.length > 0) adapter.renderCaptions?.(captionOps);
     const { signals } = planBeatBehaviors(prev, state.battleState, beatsAdvanced, view);
     for (const signal of signals) onSignal(signal);
     controls.sync();
