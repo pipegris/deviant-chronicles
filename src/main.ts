@@ -1,28 +1,63 @@
-import { startArena } from './render/arena-boot';
+import { loadBundle, bootFromBundle } from './render/arena-boot';
+import type { ReplayBundle } from './schema/replay-bundle';
 
-// Story 2.3: the browser entry boots the Phaser ARENA (the RenderPort + playback drive), replacing
-// the template's "Make something fun!" demo scene. The Anthropic SDK is NOT on this path (R4 — the
-// browser entry never imports @anthropic-ai/sdk). The old template bootstrap (src/game/main.ts +
-// its demo scenes) is left in place but unused.
-// A canned dev Saga so the operator can WATCH the victory panel during `pnpm dev` BEFORE the real
-// claude-opus-4-8 bake (the deferred Epic-5 operator step). It is NOT a real bundle — the production
-// browser path carries no baked Saga yet (Story 5.2 loads the bundle), so the live victory panel is
-// otherwise dormant (the SAME dormant-in-fixture reality as the summon cinematic). [story Task 4]
+// Story 2.3 / 5.2: the browser entry boots the Phaser ARENA (the RenderPort + playback drive) FROM the
+// committed ReplayBundle. It fetch+Zod-validates public/bundles/story-10-1.json via loadBundle, then
+// runs the Replay from it via bootFromBundle — fully client-side, NO external service (offline-at-
+// replay, NFR-5). The Anthropic SDK is NOT on this path (R4 — the browser entry never imports
+// @anthropic-ai/sdk; the bundle is a static JSON, the boot's Saga source is the SDK-free reader). The
+// old template bootstrap (src/game/main.ts + its demo scenes) is left in place but unused. [story Task 4]
+// A canned dev Saga override so the operator can force the victory panel during `pnpm dev` even before
+// the bundle carries an authored Saga. The committed bundle now carries a (placeholder) Saga, so the
+// panel lights up from the bundle WITHOUT this override — it is kept only as a dev convenience.
 const DEV_PREVIEW_SAGA =
   'And in the last hour the Forgemaiden raised her hammer against the Hanging Curse of the Endless ' +
   'Wait; the kingdom held its breath, and when the curse was bound at last she cried across the ' +
   'smoking field: "By hammer and hash, it is done!"';
 
 document.addEventListener('DOMContentLoaded', () => {
-  // The DEV-ONLY ?saga preview (Story 4.2): when present, thread a canned dev Saga into the boot so the
-  // operator can watch the victory panel render at the milestone during `pnpm dev`. GUARDED by
-  // import.meta.env.DEV: Vite statically replaces it with `false` in `build`, so this branch (and the
-  // canned string's only use) dead-code-eliminates from the production bundle — no dev Saga ships. It
-  // injects NO real bundle and does NOT alter the production path (which carries a null Saga until
-  // Story 5.2). The SAME ?cinematic= DCE-preview precedent. [story Task 4 §"Operator-verifying the panel"]
+  // Fetch + Zod-validate the committed bundle FIRST (the async boundary), then boot synchronously from
+  // it. loadBundle fails LOUD on a malformed/missing bundle (build-time-strict / replay-forgiving line)
+  // — a missing bundle is a hard boot error, not a silent fallback. The .catch surfaces it observably.
+  void loadBundle()
+    .then((bundle) => bootArena(bundle))
+    .catch((err: unknown) => {
+      // review F1: surface the boot failure as a CLEAN, observable error — log loudly AND render a
+      // visible boot-error banner — instead of re-throwing into a dangling rejection (the terminal
+      // .catch of a void-ed promise has no further handler, so a throw here is only an unhandled-
+      // rejection warning, not an attributable failure). A missing/old/malformed bundle must not
+      // silently render nothing.
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error('Replay boot failed: could not load the ReplayBundle.', error);
+      renderBootError(error);
+    });
+});
+
+// review F1: render a visible boot-error banner into the game container so a missing/malformed bundle
+// produces an OBSERVABLE failure on screen (the fail-loud intent), not a blank canvas + a console-only
+// rejection. Text-content only (no innerHTML) so the error message can never inject markup.
+function renderBootError(error: Error): void {
+  const host = document.getElementById('game-container') ?? document.body;
+  const banner = document.createElement('div');
+  banner.setAttribute('role', 'alert');
+  banner.dataset.bootError = 'true';
+  banner.textContent = `Replay failed to load: ${error.message}`;
+  host.appendChild(banner);
+}
+
+function bootArena(bundle: ReplayBundle): void {
+  // The DEV-ONLY ?saga preview (Story 4.2): when present, thread the canned dev Saga OVERRIDE into the
+  // boot so the operator can watch the victory panel render even if the bundle's Saga is unauthored.
+  // GUARDED by import.meta.env.DEV: Vite statically replaces it with `false` in `build`, so this branch
+  // (and the canned string's only use) dead-code-eliminates from the production bundle — no dev Saga
+  // ships. The production path now surfaces the BUNDLE'S baked Saga via readSaga(bundle). [story Task 4]
   const wantSagaPreview =
     import.meta.env.DEV && new URLSearchParams(window.location.search).get('saga') !== null;
-  const handle = startArena('game-container', wantSagaPreview ? { saga: DEV_PREVIEW_SAGA } : {});
+  const handle = bootFromBundle(
+    bundle,
+    'game-container',
+    wantSagaPreview ? { saga: DEV_PREVIEW_SAGA } : {},
+  );
 
   // The DEV-ONLY preview triggers (Story 3.4 summon + Story 3.5 shaman/dispel). The `?cinematic=` URL
   // flag plays a signature cinematic on demand so the operator can WATCH it. `summon` is omitted from
@@ -51,4 +86,4 @@ document.addEventListener('DOMContentLoaded', () => {
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('legend') !== null) {
     handle.legend.open();
   }
-});
+}

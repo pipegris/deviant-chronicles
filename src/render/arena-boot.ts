@@ -2,21 +2,15 @@ import type { NormalizedEvent } from '../schema/normalized-event';
 import type { BattleTimeline } from '../schema/battle-timeline';
 import { createPlaybackReducer, initialPlaybackState } from '../model/playback';
 import type { PlaybackAction, PlaybackState } from '../model/playback';
-import { pace } from '../pace/derive-beats';
-import { translate } from '../translate/translate';
-import { parseTranscript } from '../ingest/parse-transcript';
-import { parseJournal } from '../ingest/parse-journal';
-import { normalizeTranscript, normalizeJournal } from '../ingest/normalize';
-import { mergeStreams } from '../ingest/merge';
 import type { RenderPort } from './render-port';
 import { PhaserRenderAdapter } from './phaser/phaser-render-adapter';
 import { createControls } from './controls';
 import type { PlaybackControls } from './controls';
 import { createLegendOverlay } from './legend-overlay';
 import type { LegendGrounding, LegendOverlay } from './legend-overlay';
-import { fixtureAnnotations } from '../interpret/fixture-interpreter';
 import { applyOverlay } from '../interpret/overlay';
 import type { AnnotatedView } from '../interpret/overlay';
+import type { BeatAnnotation } from '../schema/beat-annotation';
 import { getLegendEntries, resolveGrounding, LEGEND_BEATS } from '../portal/portal';
 import { planBeatBehaviors } from './beat-behavior';
 import type { BeatSignal } from '../interpret/beat-signal';
@@ -25,7 +19,8 @@ import type { CaptionOp } from '../scribe/captions';
 import { planTeaching } from '../portal/teaching';
 import type { TeachingOp } from '../portal/teaching';
 import { readSaga } from '../scribe/saga';
-import type { ReplayBundle } from '../schema/replay-bundle';
+import { ReplayBundleSchema, type ReplayBundle } from '../schema/replay-bundle';
+import defaultBundleJson from '../../public/bundles/story-10-1.json';
 
 // arena-boot — wires the Story 2.2 playback reducer to the RenderPort adapter AND the Story 2.5
 // on-screen CONTROLS. The boot OWNS the reducer state + adapter + controls (one-way: controls
@@ -36,25 +31,41 @@ import type { ReplayBundle } from '../schema/replay-bundle';
 // a jump); the forward tick ANIMATES via renderTransition (the Story 2.4 split). The rAF wall-clock
 // lives in render/ (NOT Layer-0); the reducer stays pure/time-free (speed is a LOGICAL multiplier).
 //
-// Importing ingest/translate/pace from render/ is allowed — R1 only forbids Layer-0 importing
-// interpret/; nothing forbids render -> Layer-0. Fixtures are inlined via Vite ?raw (no fs in the
-// browser) and are the SAME committed fixtures the golden snapshot folds.
-import sampleTranscript from '../ingest/__fixtures__/sample-transcript.jsonl?raw';
-import sampleJournal from '../ingest/__fixtures__/sample-journal.jsonl?raw';
+// Story 5.2 — the boot now RUNS FROM A ReplayBundle (offline-at-replay, NFR-5): bootFromBundle folds
+// the bundle's BAKED battleTimeline (no in-browser recompute), threads its frozen annotations as the
+// read-only overlay, and reads its baked Saga — replacing the old inlined-fixture derivation entirely.
+// main.ts fetch+Zod-validates the committed public/bundles/story-10-1.json via loadBundle then calls
+// bootFromBundle; the boot itself touches NO Layer-0 ingest path and NO LLM/SDK (the bundle is the
+// single source). startArena stays the drivable handle the heavily-tested boot suites use — it boots
+// from the committed bundle (statically imported + Zod-validated lazily) so its drivable contract is
+// unchanged, while staying tree-shakeable from prod (main.ts never calls it). [story Task 4; AC2]
 
-const DEV_STREAM_ID = 'aecfc998031eb0576';
+// The committed fixture-derived bundle the legacy drivable handle (startArena) boots from. Parsed
+// LAZILY on the first startArena call (memoized), NOT at module load: main.ts imports this module for
+// loadBundle/bootFromBundle but NEVER calls startArena, so a lazy default keeps the static JSON import
+// + its parse referenced ONLY inside startArena — both then tree-shake out of the production bundle
+// (which fetches the bundle at runtime via loadBundle instead of inlining it). Validated fail-closed (a
+// malformed committed artifact throws on the first startArena call, not at first tick).
+let defaultBundleCache: ReplayBundle | undefined;
+function defaultBundle(): ReplayBundle {
+  defaultBundleCache ??= ReplayBundleSchema.parse(defaultBundleJson as unknown);
+  return defaultBundleCache;
+}
 
-// deriveTimeline now also returns the merged `events` (Story 3.3): the boot needs them BOTH to fold
-// the timeline AND to build the read-only Layer-1 overlay over the SAME events. (Story 2.x discarded
-// the events after pace; we now capture them.)
-function deriveTimeline(): { timeline: BattleTimeline; events: NormalizedEvent[] } {
-  const transcript = normalizeTranscript(parseTranscript(sampleTranscript, DEV_STREAM_ID), DEV_STREAM_ID);
-  const devMaxEpoch = Math.max(
-    ...transcript.map((e) => Date.parse(e.timestamp)).filter((n) => !Number.isNaN(n)),
-  );
-  const journal = normalizeJournal(parseJournal(sampleJournal), devMaxEpoch + 1);
-  const events: NormalizedEvent[] = mergeStreams([transcript, journal]);
-  return { timeline: pace(translate(events)), events };
+// loadBundle — fetch the committed bundle JSON and Zod-validate it at the boundary (build-time-strict:
+// a malformed/missing/old bundle is a HARD boot error, NOT a silent fallback — the inlined-fixture
+// path it replaced is gone). This is the offline-at-replay seam (NFR-5): a static same-origin fetch of a
+// committed JSON, no external service, no LLM. main.ts awaits it BEFORE bootFromBundle. [story Task 4]
+export async function loadBundle(url = '/bundles/story-10-1.json'): Promise<ReplayBundle> {
+  const res = await fetch(url);
+  // Guard res.ok BEFORE res.json(): on a Story-5.4 static SPA-fallback host a missing bundle returns
+  // 200 + index.html, so res.json() would throw a confusing 'Unexpected token <' rather than name the
+  // real HTTP failure. A missing bundle is a HARD boot error (build-time-strict line). [review F2]
+  if (!res.ok) {
+    throw new Error(`loadBundle: HTTP ${res.status} fetching ${url}`);
+  }
+  const json: unknown = await res.json();
+  return ReplayBundleSchema.parse(json);
 }
 
 // An optional adapter FACTORY (not a ready instance, so the boot keeps its construct-from-parent-id
@@ -66,15 +77,12 @@ function deriveTimeline(): { timeline: BattleTimeline; events: NormalizedEvent[]
 export type BootDeps = {
   createAdapter?: (parent: string) => RenderPort;
   onSignal?: (signal: BeatSignal) => void;
-  // Story 4.2 — the Saga seam. The boot shows the pre-generated closing Saga at the victory milestone;
-  // it sources the Saga from the SDK-free reader (readSaga). On the dev/CI FIXTURE path there is NO
-  // ReplayBundle loaded yet (bundle loading is Story 5.2), so neither dep is set and the resolved Saga
-  // is null — the victory wiring then has nothing to show (the documented fail-closed-to-default
-  // posture; the live dev panel is dormant until Epic 5 bakes the Saga and 5.2 loads the bundle, the
-  // SAME dormant-in-fixture reality as summon@3.4). `bundle` is the Story-5.2 path: readSaga(bundle)
-  // returns the baked prose and the SAME wiring lights up unchanged. `saga` is the resolved-string
-  // override (a test injection / the dev-preview hook), taking precedence so a panel can be exercised
-  // without a full bundle. [story Task 4 "the boot passes the Saga it has"]
+  // The Saga seams (Story 4.2/5.2). The boot shows the pre-generated closing Saga at the victory
+  // milestone, sourced from the SDK-free reader (readSaga) — never the SDK-touching author. `saga` is
+  // the resolved-string OVERRIDE (a test injection / the dev-preview hook); it takes precedence on BOTH
+  // entry points so a panel can be exercised without a full bundle. `bundle` is the legacy startArena
+  // Saga-source seam (readSaga(deps.bundle)); bootFromBundle takes the bundle positionally and reads its
+  // baked Saga directly, so `deps.bundle` is unused there. [story Task 4]
   saga?: string | null;
   bundle?: ReplayBundle;
 };
@@ -118,24 +126,82 @@ export type ArenaHandle = {
   destroy: () => void;
 };
 
-// startArena — boot the arena, render the t=0 frame PAUSED, mount the controls, and start the
-// status-gated rAF loop. `startArena('game-container')` (no deps) still works for main.ts (deps
-// optional with defaults). Returns the drivable handle.
+// bootFromBundle — the bundle-driven boot core (Story 5.2, Decision §7). Folds the bundle's BAKED
+// battleTimeline (no in-browser recompute), threads its frozen annotations as the read-only overlay,
+// and reads its baked Saga (offline-at-replay). The boot stays SYNCHRONOUS given a bundle — the async
+// fetch lives in main.ts (loadBundle) BEFORE this. Saga precedence: an explicit resolved-string
+// `deps.saga` (a test injection / dev-preview hook) wins; else readSaga(bundle) (the bundle's baked
+// prose, null when unauthored). This is the production path main.ts drives with the fetched bundle.
+// [story Task 4; AC2]
+export function bootFromBundle(
+  bundle: ReplayBundle,
+  parent = 'game-container',
+  deps: BootDeps = {},
+): ArenaHandle {
+  const saga: string | null = deps.saga !== undefined ? deps.saga : readSaga(bundle);
+  return bootCore(
+    {
+      timeline: bundle.battleTimeline,
+      events: bundle.normalizedEvents,
+      annotations: bundle.annotations,
+      saga,
+    },
+    parent,
+    deps,
+  );
+}
+
+// startArena — the drivable boot handle the heavily-tested boot suites drive (arena-boot.test.ts et
+// al.). It boots from the committed DEFAULT_BUNDLE (the fixture-derived artifact, statically imported
+// + Zod-validated once) so its timeline/events/overlay are the committed-fixture content the suites
+// assert against. Saga precedence preserves the PRE-5.2 legacy semantics EXACTLY: an explicit
+// `deps.saga` wins, else `readSaga(deps.bundle)` when a bundle is injected (the Story-4.2 Saga-source
+// seam), else null (the panel stays dormant — NOT the default bundle's placeholder Saga). main.ts uses
+// bootFromBundle (the fetched bundle), not startArena, so startArena + DEFAULT_BUNDLE tree-shake from
+// prod. `startArena('game-container')` (no deps) still works (deps optional). [story Task 4; Decision §7]
 export function startArena(parent = 'game-container', deps: BootDeps = {}): ArenaHandle {
-  const { timeline, events } = deriveTimeline();
+  const bundle = defaultBundle();
+  const saga: string | null =
+    deps.saga !== undefined ? deps.saga : deps.bundle ? readSaga(deps.bundle) : null;
+  return bootCore(
+    {
+      timeline: bundle.battleTimeline,
+      events: bundle.normalizedEvents,
+      annotations: bundle.annotations,
+      saga,
+    },
+    parent,
+    deps,
+  );
+}
+
+// The shared boot core: render the t=0 frame PAUSED, mount the controls + Legend overlay, and start
+// the status-gated rAF loop, driving every transition's behavior/caption/teaching/saga paths. It takes
+// ALREADY-RESOLVED inputs (the baked timeline, the events, the frozen annotations, the resolved Saga)
+// so the two entry points (bootFromBundle = the loaded bundle; startArena = the committed default)
+// share ONE wiring body and differ only in how those inputs are sourced. [story Task 4]
+function bootCore(
+  source: {
+    timeline: BattleTimeline;
+    events: readonly NormalizedEvent[];
+    annotations: readonly BeatAnnotation[];
+    saga: string | null;
+  },
+  parent: string,
+  deps: BootDeps,
+): ArenaHandle {
+  const { timeline } = source;
   const reducer = createPlaybackReducer(timeline);
   let state: PlaybackState = initialPlaybackState(timeline);
 
   // Build the read-only Layer-1 overlay ONCE at boot (Story 3.3) and thread it into every behavior
-  // call. fixtureAnnotations() is the FixtureInterpreter's SYNCHRONOUS data path (the dev/CI double —
-  // SDK-FREE, so this NEW browser-reachable edge into interpret/ stays R4-clean; the real
-  // ClaudeInterpreter is scripts-only and must NOT be browser-reached). Synchronous so the fully-built
-  // `view` exists BEFORE the first tick — the headless boot test drives advanceIfPlaying synchronously
-  // and needs the real annotations on tick 1; the async BeatInterpreter seam stays intact for the LLM
-  // impl. applyOverlay pairs the annotations side-by-side with the SAME events deriveTimeline folded
-  // (R1: the overlay is read-only, never feeding mechanics). [story Task 3 "build the AnnotatedView
-  // ONCE"; architecture.md#R4 L236-238]
-  const view: AnnotatedView = applyOverlay(events, fixtureAnnotations());
+  // call. The annotations are the bundle's FROZEN set (Story 5.2 — formerly fixtureAnnotations()
+  // directly; for the committed dev bundle they are identical content, since the fixture annotations
+  // were frozen INTO the bundle). applyOverlay pairs them side-by-side with the SAME events the bundle
+  // baked the timeline from (R1: the overlay is read-only, never feeding mechanics). The overlay is
+  // built SYNCHRONOUSLY so the fully-built `view` exists BEFORE the first tick — the headless boot test
+  // drives advanceIfPlaying synchronously and needs the annotations on tick 1. [story Task 4; #R4]
+  const view: AnnotatedView = applyOverlay([...source.events], [...source.annotations]);
 
   // The boot-owned signal sink (Story 3.3): a no-op if no consumer is wired. Story 4.1 (FR-9) now
   // wires it: an injected sink (if any) still RECEIVES every signal (the Story-3.3 contract is
@@ -151,13 +217,11 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
   // grows ONLY on the forward tick. [story Task 4]
   const captionHistory: Extract<CaptionOp, { kind: 'emit' }>[] = [];
 
-  // Story 4.2 — resolve the closing Saga string ONCE at boot via the SDK-free reader. Precedence: an
-  // explicit resolved-string `deps.saga` (a test injection / the dev-preview hook) wins; else read it
-  // from a loaded `deps.bundle` (the Story-5.2 path); else null (the bundle-less dev/CI fixture path).
-  // readSaga is the only Saga source the boot touches — the browser path stays offline-at-replay
-  // (no LLM/SDK; saga-author.ts is never imported here). [story Task 4]
-  const saga: string | null =
-    deps.saga !== undefined ? deps.saga : deps.bundle ? readSaga(deps.bundle) : null;
+  // Story 4.2/5.2 — the closing Saga string, resolved by the caller (bootFromBundle = readSaga(bundle)
+  // with a deps.saga override; startArena = the legacy deps.saga/deps.bundle/null precedence). readSaga
+  // is the only Saga source either path touches — the browser path stays offline-at-replay (no LLM/SDK;
+  // saga-author.ts is never imported here). [story Task 4]
+  const saga: string | null = source.saga;
   // The boot-owned `sagaShown` guard: render-side TRANSIENT state (the captionHistory/cinematicActive
   // precedent) — never in the reducer, never serialized. Latches true when the Saga is shown at the
   // victory edge so a re-render / a later clamped tick does not re-narrate the milestone. It is

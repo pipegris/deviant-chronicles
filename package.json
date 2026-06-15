@@ -14,7 +14,7 @@
     "interpret:story-10-1": "jiti scripts/interpret.ts --transcript src/ingest/__fixtures__/sample-transcript.jsonl --journal src/ingest/__fixtures__/sample-journal.jsonl --stream-id aecfc998031eb0576 --out public/bundles/story-10-1.annotations.json",
     "saga:story-10-1": "jiti scripts/scribe-saga.ts --transcript src/ingest/__fixtures__/sample-transcript.jsonl --journal src/ingest/__fixtures__/sample-journal.jsonl --stream-id aecfc998031eb0576 --out public/bundles/story-10-1.saga.json",
     "scrub:story-10-1": "jiti scripts/scrub.ts --transcript src/ingest/__fixtures__/sample-transcript.jsonl --journal src/ingest/__fixtures__/sample-journal.jsonl --stream-id aecfc998031eb0576 --out-scrubbed public/bundles/story-10-1.scrubbed.json --out-report public/bundles/story-10-1.scrub-report.json",
-    "bundle:story-10-1": "node -e \"console.log('bundle:story-10-1 not yet implemented (Epic 5, Story 5.2)'); process.exit(0)\""
+    "bundle:story-10-1": "jiti scripts/build-bundle.ts --transcript src/ingest/__fixtures__/sample-transcript.jsonl --journal src/ingest/__fixtures__/sample-journal.jsonl --stream-id aecfc998031eb0576 --approval src/bundle/__fixtures__/dev-approval.json --out public/bundles/story-10-1.json"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "0.104.1",

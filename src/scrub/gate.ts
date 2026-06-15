@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
-import { z } from 'zod';
 import { canonicalJSON } from '../interpret/freeze';
 import type { ScrubResult, ScrubReport } from './scrub';
+import { ScrubApprovalSchema, type ScrubApproval } from './approval';
+
+// Re-export the approval marker shape so existing importers of `./gate` are unchanged. The schema
+// itself lives in the crypto-free ./approval leaf so the browser-reachable bundle schema can embed it
+// WITHOUT dragging this module's node:crypto into the browser bundle (see ./approval). [story Task 1]
+export { ScrubApprovalSchema, type ScrubApproval };
 
 // Story 5.1 / AC2 — the PURE publish-gate predicate + the manual-review approval-marker contract. This is
 // the privacy guardrail's ENFORCEMENT point: a public ReplayBundle MUST NOT be emitted unless (a) the
@@ -24,23 +29,6 @@ import type { ScrubResult, ScrubReport } from './scrub';
 // fails CLOSED: any mismatch / missing marker / schema-invalid marker returns ok:false, never throws on a
 // bad marker (a bad marker is a BLOCK reason, not a crash). Reasons reference hashes/ids only — never a
 // secret value (the report/scrub no-leak posture holds here too). SDK-free + phaser-free (r4-isolation grep).
-
-// The manual-review approval marker. Binds an approval to a SPECIFIC scrubbed output (scrubHash) and a
-// SPECIFIC report (reportHash) so an approval CANNOT be reused after the session or pattern set changes —
-// if either changes, the hashes change and the old marker no longer matches → the gate BLOCKS. approvedBy/
-// approvedAt are operator-recorded DATA (not gate-computed), keeping the predicate clock-free/deterministic.
-export const ScrubApprovalSchema = z
-  .object({
-    // A future shape change bumps this so an old marker cannot be reused after the contract changes.
-    $markerVersion: z.literal(1),
-    scrubHash: z.string().min(1),
-    reportHash: z.string().min(1),
-    approvedBy: z.string().min(1),
-    approvedAt: z.string().min(1),
-  })
-  .strict();
-
-export type ScrubApproval = z.infer<typeof ScrubApprovalSchema>;
 
 // The gate verdict: ok + the human-readable reasons it blocked (empty when ok). Reasons name hashes/ids
 // only — NEVER a secret value (the load-bearing no-leak invariant the gate test asserts).

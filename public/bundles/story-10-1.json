@@ -1,0 +1,671 @@
+{
+  "schemaVersion": 1,
+  "normalizedEvents": [
+    {
+      "orderKey": {
+        "logicalClock": 0,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 0
+      },
+      "eventId": "u-0001",
+      "eventType": "prompt",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "2026-06-14T15:56:48.752Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "text": "Kickoff: implement the ingest pipeline for Story 10.1."
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 1,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 1
+      },
+      "eventId": "u-0002#1",
+      "eventType": "text",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "2026-06-14T15:57:01.100Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "text": "I will start by reading the schema then editing the parser."
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 2,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 2
+      },
+      "eventId": "u-0002#2",
+      "eventType": "tool_use",
+      "toolName": "Read",
+      "subtype": null,
+      "timestamp": "2026-06-14T15:57:01.100Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "input": {
+          "file_path": "/work/project/src/schema/normalized-event.ts"
+        }
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 3,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 3
+      },
+      "eventId": "u-0003#0",
+      "eventType": "tool_result",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "2026-06-14T15:57:03.500Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "content": "export const NormalizedEventSchema = ..."
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 4,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 4
+      },
+      "eventId": "u-0004#0",
+      "eventType": "tool_use",
+      "toolName": "Write",
+      "subtype": null,
+      "timestamp": "2026-06-14T15:58:10.000Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "input": {
+          "file_path": "/work/project/src/ingest/parse-transcript.ts",
+          "content": "export function parseTranscript() {}"
+        }
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 5,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 5
+      },
+      "eventId": "u-0005#0",
+      "eventType": "tool_result",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "2026-06-14T15:58:11.200Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "content": "File created."
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 6,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 6
+      },
+      "eventId": "u-0006#0",
+      "eventType": "tool_use",
+      "toolName": "Edit",
+      "subtype": null,
+      "timestamp": "2026-06-14T16:00:30.000Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "input": {
+          "file_path": "/work/project/src/ingest/parse-transcript.ts",
+          "old_string": "{}",
+          "new_string": "{ return []; }"
+        }
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 7,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 7
+      },
+      "eventId": "u-0007#0",
+      "eventType": "tool_result",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "2026-06-14T16:00:31.500Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "content": "Edit applied."
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 8,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 8
+      },
+      "eventId": "u-0008#0",
+      "eventType": "tool_use",
+      "toolName": "Bash",
+      "subtype": null,
+      "timestamp": "2026-06-14T16:05:00.000Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "input": {
+          "command": "pnpm vitest run",
+          "description": "Run the test suite"
+        }
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 9,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 9
+      },
+      "eventId": "u-0009#0",
+      "eventType": "tool_result",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "2026-06-14T16:05:09.300Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": true,
+      "retryCount": 0,
+      "payload": {
+        "content": "FAIL src/ingest/parse-transcript.test.ts"
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 10,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 10
+      },
+      "eventId": "u-0010#0",
+      "eventType": "tool_use",
+      "toolName": "Read",
+      "subtype": null,
+      "timestamp": "2026-06-14T16:06:00.000Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "input": {
+          "file_path": "/work/project/src/ingest/normalize.ts"
+        }
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 11,
+        "streamId": "aecfc998031eb0576",
+        "seqWithinStream": 11
+      },
+      "eventId": "u-0011#0",
+      "eventType": "tool_result",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "2026-06-14T16:06:01.500Z",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export function normalizeTranscript() {}"
+          },
+          {
+            "type": "tool_result",
+            "toolUseId": "t-read-2-nested",
+            "content": "nested raw payload",
+            "isError": false
+          }
+        ]
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 12,
+        "streamId": "orchestrator",
+        "seqWithinStream": 0
+      },
+      "eventId": "phase-dev-OPAQUEHASH-1#started",
+      "eventType": "journal_started",
+      "toolName": null,
+      "subtype": null,
+      "timestamp": "",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "result": null,
+        "key": "phase-dev-OPAQUEHASH-1"
+      }
+    },
+    {
+      "orderKey": {
+        "logicalClock": 13,
+        "streamId": "orchestrator",
+        "seqWithinStream": 1
+      },
+      "eventId": "phase-dev-OPAQUEHASH-1#result",
+      "eventType": "journal_result",
+      "toolName": null,
+      "subtype": "complete",
+      "timestamp": "",
+      "streamDepth": 0,
+      "exitCode": null,
+      "isError": false,
+      "retryCount": 0,
+      "payload": {
+        "result": {
+          "status": "complete",
+          "verdict": "pass"
+        },
+        "key": "phase-dev-OPAQUEHASH-1"
+      }
+    }
+  ],
+  "annotations": [
+    {
+      "eventRef": "u-0002#1",
+      "beatType": "dispel",
+      "confidence": 0.8,
+      "interpreterVersion": "fixture-v1",
+      "sourceHash": "fixture",
+      "groundingPointer": {
+        "eventRefs": [
+          "u-0002#1",
+          "u-0002#2",
+          "u-0003#0"
+        ]
+      }
+    },
+    {
+      "eventRef": "u-0010#0",
+      "beatType": "shaman",
+      "confidence": 0.7,
+      "interpreterVersion": "fixture-v1",
+      "sourceHash": "fixture",
+      "groundingPointer": {
+        "eventRefs": [
+          "u-0009#0",
+          "u-0010#0"
+        ]
+      }
+    }
+  ],
+  "battleTimeline": {
+    "schemaVersion": 1,
+    "beats": [
+      {
+        "orderKey": {
+          "logicalClock": 0,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 0
+        },
+        "actionType": "scout",
+        "sourceEventIds": [
+          "u-0001",
+          "u-0002#1",
+          "u-0002#2",
+          "u-0003#0"
+        ],
+        "weight": 2,
+        "dwellMs": 240
+      },
+      {
+        "orderKey": {
+          "logicalClock": 4,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 4
+        },
+        "actionType": "melee",
+        "sourceEventIds": [
+          "u-0004#0"
+        ],
+        "weight": 20,
+        "dwellMs": 2400
+      },
+      {
+        "orderKey": {
+          "logicalClock": 5,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 5
+        },
+        "actionType": "melee",
+        "sourceEventIds": [
+          "u-0005#0"
+        ],
+        "weight": 16,
+        "dwellMs": 1920
+      },
+      {
+        "orderKey": {
+          "logicalClock": 6,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 6
+        },
+        "actionType": "melee",
+        "sourceEventIds": [
+          "u-0006#0"
+        ],
+        "weight": 20,
+        "dwellMs": 2400
+      },
+      {
+        "orderKey": {
+          "logicalClock": 7,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 7
+        },
+        "actionType": "melee",
+        "sourceEventIds": [
+          "u-0007#0"
+        ],
+        "weight": 16,
+        "dwellMs": 1920
+      },
+      {
+        "orderKey": {
+          "logicalClock": 8,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 8
+        },
+        "actionType": "spell",
+        "sourceEventIds": [
+          "u-0008#0"
+        ],
+        "weight": 12,
+        "dwellMs": 1440
+      },
+      {
+        "orderKey": {
+          "logicalClock": 9,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 9
+        },
+        "actionType": "counter",
+        "sourceEventIds": [
+          "u-0009#0"
+        ],
+        "weight": 13,
+        "dwellMs": 1560
+      },
+      {
+        "orderKey": {
+          "logicalClock": 10,
+          "streamId": "aecfc998031eb0576",
+          "seqWithinStream": 10
+        },
+        "actionType": "scout",
+        "sourceEventIds": [
+          "u-0010#0",
+          "u-0011#0"
+        ],
+        "weight": 2,
+        "dwellMs": 240
+      },
+      {
+        "orderKey": {
+          "logicalClock": 12,
+          "streamId": "orchestrator",
+          "seqWithinStream": 0
+        },
+        "actionType": "idle",
+        "sourceEventIds": [
+          "phase-dev-OPAQUEHASH-1#started"
+        ],
+        "weight": 1,
+        "dwellMs": 120
+      },
+      {
+        "orderKey": {
+          "logicalClock": 13,
+          "streamId": "orchestrator",
+          "seqWithinStream": 1
+        },
+        "actionType": "melee",
+        "sourceEventIds": [
+          "phase-dev-OPAQUEHASH-1#result"
+        ],
+        "weight": 16,
+        "dwellMs": 1920
+      }
+    ],
+    "totalDurationMs": 14160
+  },
+  "tuningConfig": {
+    "pacingWeights": {
+      "$schemaVersion": 1,
+      "weights": {
+        "melee": 10,
+        "spell": 12,
+        "scout": 2,
+        "summon": 15,
+        "counter": 8,
+        "idle": 1,
+        "aetherStorm": 5
+      },
+      "modifiers": {
+        "mirageStrike": 4,
+        "solidStrike": 2,
+        "bossDamage": 6,
+        "resolveDrain": 5
+      },
+      "dwell": {
+        "dwellMsPerWeightUnit": 120
+      }
+    },
+    "windowConfig": {
+      "$schemaVersion": 1,
+      "montageThresholdWeight": 2,
+      "minRunToCollapse": 2
+    },
+    "translationRules": {
+      "$schemaVersion": 1,
+      "rules": [
+        {
+          "id": "aether-storm",
+          "match": {
+            "eventType": "journal_result",
+            "subtypeIn": [
+              "overload",
+              "synth_failure",
+              "rate_limit",
+              "backoff",
+              "network_wait",
+              "error_529"
+            ]
+          },
+          "emit": {
+            "actionType": "aetherStorm",
+            "isAetherStorm": true
+          }
+        },
+        {
+          "id": "aether-storm-result",
+          "match": {
+            "eventType": "tool_result",
+            "contentPattern": "(?i)(\\b529\\b|overload|rate.?limit|backoff|network ?wait|too many requests|service unavailable)",
+            "isError": true
+          },
+          "emit": {
+            "actionType": "aetherStorm",
+            "isAetherStorm": true
+          }
+        },
+        {
+          "id": "bash-spell",
+          "match": {
+            "eventType": "tool_use",
+            "toolName": [
+              "Bash"
+            ],
+            "commandPattern": "^(?:pnpm|npm|npx|yarn)(?: run| exec)? (?:test|build|lint|typecheck)(?![\\w-])|^(?:pnpm|npm|npx|yarn)(?: run| exec)? (?:vitest|tsc|eslint|jest)\\b|\\b(?:vitest|tsc|eslint|jest)\\b"
+          },
+          "emit": {
+            "actionType": "spell",
+            "opensStrike": true
+          }
+        },
+        {
+          "id": "edit-write-melee",
+          "match": {
+            "eventType": "tool_use",
+            "toolName": [
+              "Edit",
+              "Write"
+            ]
+          },
+          "emit": {
+            "actionType": "melee",
+            "problemIntegrityDelta": -10,
+            "isMirageCandidate": true,
+            "opensStrike": true
+          }
+        },
+        {
+          "id": "read-scout",
+          "match": {
+            "eventType": "tool_use",
+            "toolName": [
+              "Read",
+              "Grep",
+              "Glob"
+            ]
+          },
+          "emit": {
+            "actionType": "scout"
+          }
+        },
+        {
+          "id": "task-summon",
+          "match": {
+            "eventType": "tool_use",
+            "toolName": [
+              "Task"
+            ]
+          },
+          "emit": {
+            "actionType": "summon"
+          }
+        },
+        {
+          "id": "result-fail-counter",
+          "match": {
+            "eventType": "tool_result",
+            "isError": true
+          },
+          "emit": {
+            "actionType": "counter",
+            "resolveDelta": -8
+          }
+        },
+        {
+          "id": "result-pass-damage",
+          "match": {
+            "eventType": "tool_result",
+            "isError": false,
+            "resolvesStrike": true
+          },
+          "emit": {
+            "actionType": "melee",
+            "problemIntegrityDelta": -6
+          }
+        },
+        {
+          "id": "journal-pass-damage",
+          "match": {
+            "eventType": "journal_result",
+            "subtypeIn": [
+              "pass",
+              "complete"
+            ]
+          },
+          "emit": {
+            "actionType": "melee",
+            "problemIntegrityDelta": -6
+          }
+        }
+      ],
+      "default": {
+        "actionType": "idle",
+        "resolveDelta": 0,
+        "problemIntegrityDelta": 0
+      }
+    },
+    "modelTuning": {
+      "$schemaVersion": 1,
+      "initial": {
+        "problemIntegrity": 100,
+        "resolve": 100
+      },
+      "insight": {
+        "maxGauge": 100,
+        "chargePerStruggle": 60,
+        "dischargeThreshold": 50
+      },
+      "boss": {
+        "id": "boss",
+        "type": "feature",
+        "hp": 100
+      },
+      "effects": {
+        "integrityDamagePerWeight": 1,
+        "resolveDrainPerWeight": 1
+      }
+    }
+  },
+  "saga": "«PLACEHOLDER SAGA — the real claude-opus-4-8 bake over the full scrubbed session is the deferred operator step. Run `pnpm bundle:story-10-1 --real ...` to replace this with the authored Saga.»",
+  "assetManifest": {
+    "hero": "assets/hero.png",
+    "boss": "assets/boss.png",
+    "arena": "assets/arena.png"
+  },
+  "annotationHash": "c10c15aa86e16bee87ffb548f47b457dda84b441ad01d19911a480369496442f",
+  "scrub": {
+    "scrubHash": "ab7e9f79bdd422bcc021c56bbe0b2dab74d08e9bc4aeb4eab4557000d66320ac",
+    "reportHash": "c95eeb282a567267991744143ebcf33eeb22a2a2dbf6a051a8fedf7e4d6d5c85",
+    "patternSetVersion": "1:9c60b414c25e14df",
+    "approval": {
+      "$markerVersion": 1,
+      "scrubHash": "ab7e9f79bdd422bcc021c56bbe0b2dab74d08e9bc4aeb4eab4557000d66320ac",
+      "reportHash": "c95eeb282a567267991744143ebcf33eeb22a2a2dbf6a051a8fedf7e4d6d5c85",
+      "approvedBy": "dev-fixture@dev-chronicles.invalid",
+      "approvedAt": "2026-06-15T00:00:00.000Z"
+    }
+  }
+}

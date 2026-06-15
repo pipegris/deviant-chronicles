@@ -19,7 +19,9 @@ const SCRUB = dirname(fileURLToPath(import.meta.url));
 
 // The scrub core modules that MUST stay SDK-free AND phaser-free (the testable logic; scripts/scrub.ts
 // is thin glue, out of vitest's src/**/*.test.ts include scope, proven SDK-free by the dist-grep).
-const SCRUB_MODULES = ['scrub.ts', 'scrub-patterns.ts', 'gate.ts'];
+// approval.ts (Story 5.2) is the crypto-free marker-shape leaf the browser-reachable bundle schema
+// imports — it MUST stay SDK/phaser-free too (it is on the browser path via schema/replay-bundle.ts).
+const SCRUB_MODULES = ['scrub.ts', 'scrub-patterns.ts', 'gate.ts', 'approval.ts'];
 
 describe('Story 5.1 (R4) — scrub/ core imports no @anthropic-ai/sdk (pattern-based, NO LLM)', () => {
   for (const file of SCRUB_MODULES) {

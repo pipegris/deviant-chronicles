@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T13:30:00Z
+last_updated: 2026-06-15T15:00:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -575,6 +575,77 @@ development_status:
   # in-progress (5-1 is not the Epic-5 capstone).
   epic-5: in-progress
   5-1: done
-  5-2: backlog
+  # 5-2 moved backlog -> ready-for-dev (create-story). The FINAL Epic-5 CODE story (NFR-5): the offline
+  # ReplayBundle build orchestration + the browser bundle-LOAD path. (1) NEW src/bundle/assemble-bundle.ts
+  # — a PURE assembler (vitest only runs src/**/*.test.ts, so logic lives in src/, the 3.2/5.1 thin-script
+  # split): assembleBundle({scrubResult, approval, annotations, versions, battleTimeline, tuningConfig,
+  # saga, assetManifest}) runs the Story-5.1 isPublishable() gate FIRST (throws fail-closed on !ok), uses
+  # scrubResult.scrubbedEvents as the PUBLIC normalizedEvents, freezeAnnotations() (3.2) to validate+
+  # content-address+reject dangling refs, composes a ReplayBundleSchema-valid bundle, + bundleHash(bundle)
+  # =sha256(canonicalJSON(bundle)) REUSING freeze.ts's canonicalJSON (AC2 whole-bundle determinism, distinct
+  # from the embedded annotationHash run-identity key). (2) EDIT src/schema/replay-bundle.ts: ADD a nullable
+  # `scrub: {scrubHash, reportHash, patternSetVersion, approval: ScrubApprovalSchema}|null` — the Story-5.1
+  # forward-reference (the TuningConfigSchema precedent); schemaVersion STAYS literal(1) (additive nullable =
+  # backward-compatible). (3) REWRITE scripts/build-bundle.ts (currently a node -e placeholder) — thin argv/
+  # fs glue mirroring scrub.ts/interpret.ts/scribe-saga.ts: ingest(1.3) -> scrub(5.1 scrubSession) -> load
+  # ScrubApproval marker -> pace(translate(scrubbedEvents)) [baked timeline; scrubbing is mechanically inert
+  # on pacing — string leaves only] -> interpret [MOCKED: FixtureInterpreter; --real selects ClaudeInterpreter]
+  # -> saga [MOCKED: committed placeholder string; --real selects SagaAuthor] -> assembleBundle -> write
+  # public/bundles/story-10-1.json. (4) EDIT src/render/arena-boot.ts + src/main.ts: the boot now LOADS
+  # public/bundles/story-10-1.json (async fetch + ReplayBundleSchema.parse at the boundary) and runs from it
+  # (bootFromBundle taking timeline/events/annotations/saga FROM the bundle), REMOVING the ?raw fixture
+  # derivation + deriveTimeline() (offline-at-replay, NFR-5; the Story-4.2-prewired deps.bundle path
+  # completed). (5) COMMIT a fixture-derived public/bundles/story-10-1.json (FixtureInterpreter annotations +
+  # placeholder Saga + scrubbed fixture events + a dev ScrubApproval marker for a PASSING gate path) so the
+  # app runs end-to-end now. Established MOCKED-LLM decision: NO real claude-sonnet-4-6/opus call, NO key in
+  # dev/CI — the real full-session bake (real LLM + scrubbed .sources) is the DEFERRED operator step (the
+  # --real CLI seam), regenerating the bundle with no code change. GATE-VERIFIABLE: assembler builds a Zod-
+  # valid bundle (mocked); gate BLOCKS unscrubbed/unreviewed + PASSES scrubbed+approved; boot loads the
+  # committed bundle + the Replay runs (headless boot smoke FROM the bundle); hash determinism (same inputs ->
+  # same annotationHash + bundleHash); R4 (no anthropic in dist; assembler+boot SDK-free). OPERATOR-VERIFIED
+  # (NOT a gate): the on-screen end-to-end replay after the real bake. Gates: typecheck/lint clean (R1/R4/R5
+  # hold, eslint.config.ts UNTOUCHED), full suite green, BOTH golden snapshots (pace/+ingest/) byte-stable (no
+  # Layer-0 code added), build OK + grep -ril anthropic dist/ = NOTHING. NOT final art (5.3) or deploy (5.4).
+  # NO git commit (operator commits between stories; the deliverable public/bundles/story-10-1.json is staged
+  # for the operator). epic-5 stays in-progress (5-2 is not the first Epic-5 story).
+  # 5-2 moved ready-for-dev -> in-progress -> review (dev-story, baseline f5b5280). The offline ReplayBundle
+  # build orchestration + the browser bundle-LOAD path are DONE (mocked LLM): (1) NEW src/bundle/assemble-
+  # bundle.ts — PURE assembleBundle() runs the Story-5.1 isPublishable() gate FIRST (throws fail-closed),
+  # uses scrubResult.scrubbedEvents as the public normalizedEvents, freezeAnnotations() (3.2), composes a
+  # ReplayBundleSchema-valid bundle + bundleHash()=sha256(canonicalJSON) REUSING freeze.ts (AC2). (2) EDIT
+  # src/schema/replay-bundle.ts — ADDED nullable+optional `scrub: ScrubProvenanceSchema|null` (the 5.1
+  # forward-reference; schemaVersion STAYS literal(1)); ScrubApprovalSchema moved to a NEW crypto-free leaf
+  # src/scrub/approval.ts (gate.ts re-exports) so the browser-reachable schema does NOT pull gate.ts's
+  # node:crypto into the Vite bundle. (3) REWROTE scripts/build-bundle.ts — thin glue: ingest -> scrub ->
+  # load ScrubApproval -> pace(translate(scrubbedEvents)) -> interpret [FixtureInterpreter; --real seam
+  # = ClaudeInterpreter] -> saga [placeholder; --real = SagaAuthor] -> assembleBundle -> write. (4) EDIT
+  # arena-boot.ts + main.ts — boot now LOADS public/bundles/story-10-1.json (loadBundle: fetch + Zod-parse)
+  # and runs from it (bootFromBundle); REMOVED the ?raw/deriveTimeline derivation (offline-at-replay). (5)
+  # COMMITTED public/bundles/story-10-1.json (FixtureInterpreter annotations + placeholder Saga + scrubbed
+  # fixture events + a dev ScrubApproval marker for a PASSING gate). GATES GREEN: typecheck/lint clean
+  # (R1/R4/R5 hold, eslint.config.ts UNTOUCHED), 92 files / 929 tests, BOTH golden snapshots (pace/+ingest/)
+  # byte-stable, build OK + grep -ril anthropic dist/ = NOTHING, determinism = two builds byte-identical.
+  # OPERATOR-VERIFIED (NOT a gate): the on-screen end-to-end replay after the real bake (--real). NO git
+  # commit (the deliverable public/bundles/story-10-1.json is staged for the operator). epic-5 stays
+  # in-progress (5-2 is not the first Epic-5 story; 5-3 art + 5-4 deploy remain).
+  # 5-2 review -> done (senior-review fix round 1). Review APPROVED all 7 ACs; 0 high / 1 med / 4 low +
+  # 1 (F6) — 4 actionable (F1 fix + F2/F3/F4), 2 confirmed-refuted (F5/F6). F1 (med): main.ts .catch now
+  # surfaces a CLEAN observable failure (loud console.error + a role="alert" boot-error banner via
+  # renderBootError) instead of re-throwing into a dangling unhandled rejection; first main.ts test
+  # coverage (src/main.test.ts, jsdom). F2: loadBundle guards res.ok before res.json() (a missing bundle
+  # on a static SPA-fallback host gives a clear HTTP error, not "Unexpected token <") + a 404 test. F3:
+  # assembleBundle validates every baked-timeline beat sourceEventId resolves to a shipped event (defense-
+  # in-depth at the sole composition point, mirroring freezeAnnotations) + 2 tests. F4: the mocked path
+  # pins interpreterVersion/promptVersion to the fixture-v1 constants (the flags are --real-only) so a
+  # stray --interpreter-version can't desync annotationHash from the embedded annotations. F5 (refuted):
+  # bundleHash folding scrub.approval is by-design provenance (Decision §3); AC2 holds (approval is an
+  # input; byte-identical two-build diff). F6 (refuted): scrub .nullable().optional() is intentional 1.2
+  # backward-compat — the assembler ALWAYS populates scrub + the committed-bundle guard asserts non-null.
+  # The committed public/bundles/story-10-1.json is BYTE-IDENTICAL after a rebuild (determinism intact).
+  # Gates re-run GREEN: typecheck/lint clean (R1/R4/R5 untouched, eslint.config.ts UNCHANGED), 93 files /
+  # 937 tests (was 92/931: +1 file main.test.ts, +6 tests), build OK + grep -ril anthropic dist/ = NOTHING,
+  # BOTH golden snapshots (pace/+ingest/) byte-stable. NO git commit. epic-5 stays in-progress (5-3 art +
+  # 5-4 deploy remain — operator/external steps).
+  5-2: done
   5-3: backlog
   5-4: backlog
