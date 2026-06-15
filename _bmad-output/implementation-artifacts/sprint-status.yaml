@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T00:30:00Z
+last_updated: 2026-06-15T02:30:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -29,7 +29,48 @@ development_status:
   2-5: done
   # Epic 3 — The Signature Beats (Layer 1 — Interpreted + Cinematics)
   epic-3: in-progress
-  3-1: backlog
+  # 3-1 moved backlog -> ready-for-dev (create-story). FIRST Epic-3 story (FR-2 foundation, Layer 1):
+  # the BeatInterpreter INTERFACE + a deterministic FixtureInterpreter double + a READ-ONLY overlay.
+  # ADDS src/interpret/{beat-interpreter.ts (interface: interpret(events): Promise<BeatAnnotation[]> —
+  # async so Story 3.2's real claude-interpreter drops in behind the SAME seam), fixture-interpreter.ts
+  # (CI double: FIXED hand-authored annotations for the committed ingest fixture, ZERO network/LLM/
+  # clock/RNG; deliberately SDK-free even though interpret/ is an R4-allowed zone), overlay.ts (pure
+  # applyOverlay -> read-only AnnotatedView keyed by eventRef; never folds into BattleState/HP/Beat
+  # weights)}. Two annotations authored against the fixture's real 14 eventIds: a Dispel on the
+  # assumption+Read pair (u-0002#1/#2 + u-0003#0) and a Shaman on the root-cause re-Read (u-0009#0[FAIL]
+  # + u-0010#0); Summon OMITTED by design (thin redacted slice has no summon-shaped event — rich beats
+  # come from the full session at bundle time, 3.2/Epic 5). Reuses Story 1.2's BeatAnnotation schema +
+  # Story 1.3's runIngest() helper; touches NO Layer-0 / schema / render code. FULLY gate-provable (no
+  # operator-verified surface — no pixels): AC1 = double implements the interface + returns schema-valid
+  # annotations + determinism (call-twice toEqual) + offline (source-grep no SDK/clock/RNG); AC2 = every
+  # groundingPointer.eventRef resolves to a real fixture eventId (no dangling refs) + applyOverlay does
+  # not mutate inputs (snapshot-equality) + overlay carries no HP/weight fields + R1 grep (lint already
+  # enforces ingest/translate/pace/model !-> interpret/). Gates: typecheck/lint clean (R1/R4/R5 hold,
+  # eslint.config.ts UNCHANGED), full suite green, BOTH golden snapshots (pace/ + ingest/) byte-stable,
+  # build OK + no anthropic in dist (interpret/ is browser-unreachable, tree-shaken). epic-3 stays
+  # in-progress.
+  # 3-1 ready-for-dev -> in-progress -> review (dev-story). Layer-1 ENTRY (FR-2 foundation):
+  # src/interpret/{beat-interpreter.ts (interface, async interpret -> Promise<BeatAnnotation[]>),
+  # fixture-interpreter.ts (deterministic CI double — 2 hand-authored annotations: Dispel@u-0002#1 +
+  # Shaman@u-0010#0, SDK-free/no clock/RNG, Zod-validated, Summon omitted by design), overlay.ts (pure
+  # applyOverlay -> read-only AnnotatedView {events,annotations,byEventRef}, never folds into mechanics)}.
+  # Made the 3 ATDD red tests green honestly (none weakened) + added 2 focused unit-test files. Gates
+  # GREEN: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts UNTOUCHED), 42 files / 438 tests (was
+  # 40/412), build OK, no anthropic in dist (interpret/ tree-shaken), BOTH golden snapshots (pace/+ingest/)
+  # byte-stable. One documented deviation: `void _events;` (codebase convention) instead of bare `_events`
+  # to satisfy eslint no-unused-vars. No git commit. epic-3 stays in-progress.
+  # 3-1 review -> done (senior-review fix round 1). Review APPROVED both ACs; 6 LOW findings, no high/med.
+  # F1 (fix): Completion Notes test count 438 -> 439 (verified actual 42 files / 439 tests). F2 (consider):
+  # broadened the R1 grep in src/interpret/r1-boundary.test.ts to also catch bare ESM side-effect imports
+  # (import '...interpret') via an `import\s+` alternation (proven: a bare-import probe in src/pace/ now
+  # fails the grep). F3 (consider): excluded Layer-0 *.test.ts from the grep scan so R1 governs MODULES only
+  # (proven: a Layer-0 test importing FixtureInterpreter no longer false-fails). F4/F5/F6 REFUTED with
+  # re-verification (Object.freeze is a story-waived optional belt-and-suspenders + fresh objects per call
+  # contain any risk; applyOverlay re-validation correctly lives at the FixtureInterpreter emission boundary;
+  # scope boundaries accurate). eslint.config.ts UNTOUCHED; R1/R4/R5 hold. Gates GREEN: typecheck/lint clean,
+  # 42 files / 439 tests, build OK (no anthropic in dist, interpret/ tree-shaken), BOTH golden snapshots
+  # (pace/+ingest/) byte-stable. No git commit. epic-3 stays in-progress.
+  3-1: done
   3-2: backlog
   3-3: backlog
   3-4: backlog
