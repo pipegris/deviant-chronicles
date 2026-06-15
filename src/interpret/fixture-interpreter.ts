@@ -34,15 +34,25 @@ const FIXTURE_ANNOTATIONS: readonly BeatAnnotation[] = [
   },
 ];
 
+// The fixed fixture annotations, validated + returned SYNCHRONOUSLY. Extracted from interpret() so a
+// SYNCHRONOUS consumer (the Story 3.3 browser boot, which threads the read-only overlay before its
+// first synchronous tick) can obtain the same deterministic annotations without the async seam — the
+// dev/CI double does no real async work, so this is the same content interpret() returns, just not
+// Promise-wrapped. The async BeatInterpreter seam (for the real LLM impl) is UNCHANGED: interpret()
+// still satisfies it by awaiting this. Each literal is BeatAnnotationSchema.parse'd — the Layer-1
+// boundary-validation mandate, and a loud guard if a future edit breaks the shape.
+export function fixtureAnnotations(): BeatAnnotation[] {
+  return FIXTURE_ANNOTATIONS.map((a) => BeatAnnotationSchema.parse(a));
+}
+
 export class FixtureInterpreter implements BeatInterpreter {
   // The annotations are pre-authored against KNOWN eventIds, so the double is
   // content-independent by design and does not read its input. `void _events` is the
   // codebase's intentional-unused convention (matches the `void _omit` pattern in the schema
-  // tests) — it satisfies both tsc noUnusedParameters and eslint no-unused-vars. Each literal
-  // is BeatAnnotationSchema.parse'd before return — the Layer-1 boundary-validation mandate,
-  // and a loud guard if a future edit breaks the shape.
+  // tests) — it satisfies both tsc noUnusedParameters and eslint no-unused-vars. Delegates to the
+  // synchronous fixtureAnnotations() (same content) so the async seam wraps one source of truth.
   async interpret(_events: NormalizedEvent[]): Promise<BeatAnnotation[]> {
     void _events;
-    return FIXTURE_ANNOTATIONS.map((a) => BeatAnnotationSchema.parse(a));
+    return fixtureAnnotations();
   }
 }

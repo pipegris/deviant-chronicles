@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T03:00:00Z
+last_updated: 2026-06-15T05:30:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -128,6 +128,82 @@ development_status:
   # interpret/+scripts/ tree-shaken), BOTH golden snapshots (pace/+ingest/) byte-stable. No git commit.
   # epic-3 stays in-progress (3-2 is not the Epic-3 capstone).
   3-2: done
-  3-3: backlog
+  # 3-3 moved backlog -> ready-for-dev (create-story). The signature-beat BEHAVIOR layer (FR-4,
+  # Layer 1 -> presentation): make the three Story-3.1-tagged beats DRIVE their battle behaviors as
+  # a PRESENTATION/SIGNAL layer, mechanically real but R1-clean. ADDS src/interpret/beat-signal.ts
+  # (the cross-layer BeatSignal type — the `scribe-correction` signal FR-9/Story 4.1 consumes;
+  # lives in interpret/ NOT render/ so scribe->interpret stays the documented direction and no R5
+  # inversion) + src/render/beat-behavior.ts (a PURE planBeatBehaviors(prev,next,beatsAdvanced,view)
+  # -> { intents, signals }, sibling to 2.4's animation-plan.ts; ZERO phaser, plain-type transient
+  # intents, reads the read-only AnnotatedView overlay + Layer-0 BattleState/Beat[] deltas, returns
+  # NO BattleState — the R1 structural proof) + a THIN Phaser consumer (ArenaScene.playBeatBehaviors
+  # sibling to playAnimations, placeholder tweens) + the boot wiring threading the FixtureInterpreter
+  # overlay into the renderTransition path (Option A). THE R1 RECONCILIATION (load-bearing): the bar
+  # movements (Dispel wasted-effort Resolve drain, breakthrough Problem-Integrity damage, Insight
+  # charge/discharge) ALREADY come from Layer-0 (battle-model.ts, Story 2.1) — this layer NEVER
+  # recomputes/mutates them; it only DRAMATIZES the deltas. The Dispel's self-inflicted Resolve
+  # stagger is a PRESENTATION cue (visual recoil), NOT a Resolve mutation. The L1->L0 bridge: a
+  # tagged annotation.eventRef is found in a Beat.sourceEventIds (the pace CONSERVATION invariant) so
+  # the behavior fires on the transition crossing that beat. Three behaviors: Shaman (imps resurrect
+  # while live, one-wave-clear on the breakthrough/gauge-discharge = root-cause-fixed; imps are
+  # presentation-only, NO per-minion HP), Dispel (mirage-shatter + resolve-stagger CUE + reveal +
+  # the scribe-correction signal), Summon/THUNDORR (fires on a `summon`-tagged breakthrough WHEN the
+  # Layer-0 gauge is charged — dischargeThreshold read via MODEL_TUNING, no hardcode). Polished
+  # CINEMATICS deferred to 3.4 (THUNDORR cutaway) + 3.5 (shatter + simultaneous-wave). Gate-provable:
+  # WHICH intents/signals fire per transition (REAL fixture for Dispel/Shaman; UNIT branch for Summon
+  # since the fixture omits `summon` by design — like 2.4's hand-built Hammer-Flurry positive branch)
+  # + determinism + R1 (no mechanics keys in intents; returns no BattleState) + the one-way wiring
+  # (fake-consumer). Operator-verified (NOT a gate): the visual reading (imps resurrect/clear, mirage
+  # shatters, THUNDORR reads decisive, 60fps). Honest gaps: Summon positive branch unit-only; Dispel
+  # Resolve-stagger is a cue not a mechanic; imps presentation-only. Gates: typecheck/lint clean
+  # (R1/R4/R5 hold, eslint.config.ts UNCHANGED), full suite green (baseline 49 files/501 tests), BOTH
+  # golden snapshots (pace/+ingest/) byte-stable, build OK + no anthropic in dist (R4 — this story
+  # makes interpret/ browser-reachable for the FIRST time via the FixtureInterpreter, which is
+  # SDK-free; claude-interpreter.ts stays scripts-only/unimported). epic-3 stays in-progress (3-3 is
+  # not the first story in epic-3).
+  # 3-3 ready-for-dev -> in-progress -> review (dev-story). Signature-beat BEHAVIORS (FR-4, Layer 1 ->
+  # presentation): a PURE src/render/beat-behavior.ts planBeatBehaviors(prev,next,beatsAdvanced,view) ->
+  # { intents, signals } (sibling to animation-plan.ts) mapping a tagged beat + the Layer-0 transition to
+  # behavior INTENTS + cross-layer SIGNALS, plus src/interpret/beat-signal.ts (the scribe-correction
+  # BeatSignal FR-9/Story-4.1 consumes) + a THIN Phaser wiring. Three behaviors: Fallen Shaman (imp
+  # resurrect-loop while the gauge is charged-not-discharged, then one-wave swarm-clear + shaman defeat on
+  # the breakthrough discharge); Dispel (mirage shatter + a resolve-stagger PRESENTATION cue + reveal + the
+  # scribe-correction signal); Eidolon Summon/THUNDORR (summon + decisive-blow on a summon-tagged
+  # breakthrough when the gauge is charged, dischargeThreshold read from MODEL_TUNING/NFR-4). R1-clean: the
+  # plan READS the read-only overlay + BattleState and writes ONLY intents/signals (never a BattleState,
+  # never a mechanics field) — the bars already moved from Layer-0. Wiring (Option-A): RenderPort gains an
+  # OPTIONAL renderBeatBehaviors? (backward-compatible — the pre-3.3 Story-2.5 fake still satisfies it);
+  # arena-boot builds the AnnotatedView ONCE synchronously (extracted fixtureAnnotations() from the
+  # FixtureInterpreter so the async seam is one source of truth) and routes signals to a boot-owned
+  # onSignal sink. Gate-PROVEN: the pure intent/signal logic (real-fixture Dispel + Shaman; UNIT-proven
+  # Summon positive branch + emission order on hand-built data — the fixture omits summon), the one-way
+  # fake-consumer wiring, the boot threading, R1 data-level (no mechanics keys, no BattleState returned),
+  # determinism, R5 lint. Operator-verified (NOT a gate): imps visibly resurrect/die as a readable wave,
+  # the mirage visibly shatters, the blow reads as decisive, 60fps (NFR-1) — watch pnpm dev. Polished
+  # CINEMATICS (full-scene THUNDORR; glass-break+record-scratch; simultaneous-wave) are 3.4/3.5 — NOT here.
+  # Gates: typecheck/lint clean (eslint.config.ts UNTOUCHED), 54 files / 532 tests (was 49/501: +5 files
+  # [4 ATDD + 1 unit], +31 tests), build OK, BOTH golden snapshots byte-UNCHANGED, grep -ril anthropic
+  # dist/ = NOTHING (R4 — interpret/ is browser-reachable for the FIRST time via the SDK-free
+  # FixtureInterpreter/overlay/beat-signal; claude-interpreter.ts stays scripts-only/unimported). DID NOT
+  # git commit (operator commits between stories). epic-3 stays in-progress.
+  # 3-3 review -> done (senior-review fix round 1). Review APPROVED all 3 ACs on the real fixture; 1 med
+  # (consider) + 2 low (doc) findings, ALL addressed, none refuted. F1 (med, the only code change): the
+  # Shaman resurrect loop was gated on hasShaman + a charged gauge as a PROXY for "the shaman beat has
+  # been reached" — correct on the committed fixture only because the charging counter (Beat[6]) precedes
+  # the shaman beat (Beat[7]). Tightened to a true anchor-crossing check: a new PURE anchorReached(view,
+  # beatsAdvanced, 'shaman') (the shaman anchor's index in view.events <= the transition's frontier event
+  # index — derived off the read-only overlay + the pace CONSERVATION invariant, the same anchor-
+  # intersection the Dispel/Summon use) is ANDed into the resurrect gate, so a session whose gauge charges
+  # BEFORE a later shaman beat no longer fires resurrect prematurely (honors Dev Notes L132). hasShaman
+  # retained only for the breakthrough swarm-clear/defeat branch. Pinned by a negative+positive regression
+  # pair (charged gauge + un-reached anchor -> zero intents; anchor crossed -> resurrect). AC1 still PASSES
+  # on the real fixture (the resurrect transition crosses Beat[8], whose events follow u-0010#0); R1-clean
+  # (reads overlay + Beat data, writes nothing). F2 (doc): Completion Notes test counts 54/532 -> 55/539
+  # (review-time 55/537 + the 2 new F1 tests). F3 (doc): File List adds the omitted
+  # src/render/phaser/arena-behavior.test.ts (headless Phaser smoke, present + passing). Gates GREEN:
+  # typecheck/lint clean (eslint.config.ts UNTOUCHED, R1/R4/R5 hold), 55 files / 539 tests, build OK, no
+  # anthropic in dist, BOTH golden snapshots (pace/+ingest/) byte-stable. No git commit. epic-3 stays
+  # in-progress (3-3 is not the Epic-3 capstone).
+  3-3: done
   3-4: backlog
   3-5: backlog

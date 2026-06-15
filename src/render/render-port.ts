@@ -1,4 +1,5 @@
 import type { BattleState, Beat } from '../schema/battle-timeline';
+import type { AnnotatedView } from '../interpret/overlay';
 
 // render-port — the ONE-WAY RenderPort interface (FR-7, R5): the swap seam. It imports BattleState
 // (and Beat) as a TYPE and imports NO phaser, so it is renderer-agnostic — swapping Phaser for
@@ -22,5 +23,17 @@ export interface RenderPort {
   // (no Phaser leak), keeping the interface renderer-agnostic and one-way. A future PixiJS adapter
   // implements this SAME method. [story Dev Notes "RenderPort: extend or not" — Option A]
   renderTransition(prev: BattleState, next: BattleState, beats: Beat[]): void;
+  // The BEHAVIOR path (Story 3.3): drive the signature-beat behaviors for the transition prev->next,
+  // reading the read-only Layer-1 overlay (AnnotatedView) the boot threads in. Like renderTransition
+  // it is a one-way COMMAND — it returns void, the adapter pushes NOTHING back upstream, and the
+  // emitted cross-layer signals go to a boot-owned sink (not back through this seam). `AnnotatedView`
+  // is a type-only import (render -> interpret is allowed; no Phaser leak), keeping the interface
+  // renderer-agnostic and one-way. A future engine adapter implements this SAME method.
+  //
+  // OPTIONAL (`?`) so the additive RenderPort extension stays BACKWARD-COMPATIBLE: a pre-3.3 adapter
+  // (e.g. the Story 2.5 fake) that predates this command still satisfies RenderPort, and the boot
+  // guards the call (`adapter.renderBeatBehaviors?.(...)`). The real PhaserRenderAdapter implements it
+  // concretely. [story Task 3 "Option A"; architecture.md#R5 L239-241]
+  renderBeatBehaviors?(prev: BattleState, next: BattleState, beats: Beat[], view: AnnotatedView): void;
   destroy(): void;
 }

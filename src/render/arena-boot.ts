@@ -12,6 +12,11 @@ import type { RenderPort } from './render-port';
 import { PhaserRenderAdapter } from './phaser/phaser-render-adapter';
 import { createControls } from './controls';
 import type { PlaybackControls } from './controls';
+import { fixtureAnnotations } from '../interpret/fixture-interpreter';
+import { applyOverlay } from '../interpret/overlay';
+import type { AnnotatedView } from '../interpret/overlay';
+import { planBeatBehaviors } from './beat-behavior';
+import type { BeatSignal } from '../interpret/beat-signal';
 
 // arena-boot — wires the Story 2.2 playback reducer to the RenderPort adapter AND the Story 2.5
 // on-screen CONTROLS. The boot OWNS the reducer state + adapter + controls (one-way: controls
@@ -30,20 +35,28 @@ import sampleJournal from '../ingest/__fixtures__/sample-journal.jsonl?raw';
 
 const DEV_STREAM_ID = 'aecfc998031eb0576';
 
-function deriveTimeline(): BattleTimeline {
+// deriveTimeline now also returns the merged `events` (Story 3.3): the boot needs them BOTH to fold
+// the timeline AND to build the read-only Layer-1 overlay over the SAME events. (Story 2.x discarded
+// the events after pace; we now capture them.)
+function deriveTimeline(): { timeline: BattleTimeline; events: NormalizedEvent[] } {
   const transcript = normalizeTranscript(parseTranscript(sampleTranscript, DEV_STREAM_ID), DEV_STREAM_ID);
   const devMaxEpoch = Math.max(
     ...transcript.map((e) => Date.parse(e.timestamp)).filter((n) => !Number.isNaN(n)),
   );
   const journal = normalizeJournal(parseJournal(sampleJournal), devMaxEpoch + 1);
   const events: NormalizedEvent[] = mergeStreams([transcript, journal]);
-  return pace(translate(events));
+  return { timeline: pace(translate(events)), events };
 }
 
 // An optional adapter FACTORY (not a ready instance, so the boot keeps its construct-from-parent-id
 // ownership) lets a test inject a FakeRenderAdapter without booting Phaser; defaults to the real one.
+// onSignal (Story 3.3) is the boot-owned SINK for the cross-layer BeatSignals the behavior plan emits
+// (the Dispel's scribe-correction signal): the boot routes each emitted signal here so Story 4.1
+// (FR-9) can subscribe to drive the caption rewrite. For THIS story a collecting/no-op sink suffices
+// (the signal TYPE + emission is what AC2 requires). One-way: the sink only RECEIVES (R5/AC1).
 export type BootDeps = {
   createAdapter?: (parent: string) => RenderPort;
+  onSignal?: (signal: BeatSignal) => void;
 };
 
 // The drivable boot handle: the live state/adapter/controls plus the two seams the headless test
@@ -62,9 +75,25 @@ export type ArenaHandle = {
 // status-gated rAF loop. `startArena('game-container')` (no deps) still works for main.ts (deps
 // optional with defaults). Returns the drivable handle.
 export function startArena(parent = 'game-container', deps: BootDeps = {}): ArenaHandle {
-  const timeline = deriveTimeline();
+  const { timeline, events } = deriveTimeline();
   const reducer = createPlaybackReducer(timeline);
   let state: PlaybackState = initialPlaybackState(timeline);
+
+  // Build the read-only Layer-1 overlay ONCE at boot (Story 3.3) and thread it into every behavior
+  // call. fixtureAnnotations() is the FixtureInterpreter's SYNCHRONOUS data path (the dev/CI double —
+  // SDK-FREE, so this NEW browser-reachable edge into interpret/ stays R4-clean; the real
+  // ClaudeInterpreter is scripts-only and must NOT be browser-reached). Synchronous so the fully-built
+  // `view` exists BEFORE the first tick — the headless boot test drives advanceIfPlaying synchronously
+  // and needs the real annotations on tick 1; the async BeatInterpreter seam stays intact for the LLM
+  // impl. applyOverlay pairs the annotations side-by-side with the SAME events deriveTimeline folded
+  // (R1: the overlay is read-only, never feeding mechanics). [story Task 3 "build the AnnotatedView
+  // ONCE"; architecture.md#R4 L236-238]
+  const view: AnnotatedView = applyOverlay(events, fixtureAnnotations());
+
+  // The boot-owned signal sink (Story 3.3): a no-op if no consumer is wired (this story); Story 4.1
+  // (FR-9) injects a collecting sink to drive the caption rewrite. The behavior plan's emitted signals
+  // are routed here, never back upstream (one-way, R5/AC1).
+  const onSignal = deps.onSignal ?? ((): void => {});
 
   const adapter = deps.createAdapter ? deps.createAdapter(parent) : new PhaserRenderAdapter(parent);
   adapter.init();
@@ -94,6 +123,16 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     if (state.cursor === prevCursor) return; // at the end: a clamped no-op, no transition to animate
     const beatsAdvanced = timeline.beats.slice(prevCursor, state.cursor);
     adapter.renderTransition(prev, state.battleState, beatsAdvanced);
+    // The BEHAVIOR path (Story 3.3) rides the SAME forward transition: drive the signature-beat
+    // behaviors via the one-way command (the adapter runs the intents on the scene), then route the
+    // emitted cross-layer signals to the boot-owned sink. The signals are recomputed via the PURE
+    // planBeatBehaviors (cheap + deterministic) because the visual command owns the intents while the
+    // boot owns the signal sink — the same (prev, next, beats, view) yields the same signals. Only the
+    // forward tick drives this; seek/restart SNAP (you cannot dramatize across a jump) and never reach
+    // here. [story Task 3 "hand the resulting intents to playBeatBehaviors; signals to a boot-owned sink"]
+    adapter.renderBeatBehaviors?.(prev, state.battleState, beatsAdvanced, view);
+    const { signals } = planBeatBehaviors(prev, state.battleState, beatsAdvanced, view);
+    for (const signal of signals) onSignal(signal);
     controls.sync();
   };
 

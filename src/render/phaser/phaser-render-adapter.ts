@@ -2,8 +2,10 @@
 // undefined. This is the ONLY file (besides the scene/textures) that touches Phaser.Game config.
 import * as Phaser from 'phaser';
 import type { BattleState, Beat } from '../../schema/battle-timeline';
+import type { AnnotatedView } from '../../interpret/overlay';
 import type { RenderPort } from '../render-port';
 import { planAnimations } from '../animation-plan';
+import { planBeatBehaviors } from '../beat-behavior';
 import { ArenaScene } from './arena-scene';
 import { DEFAULT_ASSET_MANIFEST } from './placeholder-textures';
 
@@ -110,6 +112,27 @@ export class PhaserRenderAdapter implements RenderPort {
     } else {
       this.pending = next; // still booting — the postBoot flush snaps the latest state (no motion)
     }
+  }
+
+  // The one-way BEHAVIOR command (Story 3.3): drive the signature-beat behaviors for prev->next reading
+  // the read-only overlay. Computes the behavior INTENTS via the PURE planBeatBehaviors (zero Phaser in
+  // that layer) and forwards them to the live scene's playBeatBehaviors (placeholder tweens; the 3.4/3.5
+  // cinematics are deferred). The emitted SIGNALS are owned by the boot's sink (the boot recomputes them
+  // from the same transition), so this command runs only the visual intents — nothing flows back
+  // upstream (one-way, R5/AC1). If the scene is still booting, the behavior is dropped (the static `next`
+  // snapshot is the truth; the boot snaps it via the pending flush) — never queue stale motion. Returns
+  // void. [story Task 3]
+  renderBeatBehaviors(prev: BattleState, next: BattleState, beats: Beat[], view: AnnotatedView): void {
+    if (!this.game) {
+      console.warn('PhaserRenderAdapter.renderBeatBehaviors() called before init(); behavior ignored. Call init() first.');
+      return;
+    }
+    const scene = this.ready ? (this.game.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) {
+      scene.playBeatBehaviors(planBeatBehaviors(prev, next, beats, view).intents);
+    }
+    // else: still booting — drop the behavior (presentation only; the next snapshot is snapped via the
+    // existing pending flush). No buffering of motion that would play stale once boot finishes.
   }
 
   destroy(): void {

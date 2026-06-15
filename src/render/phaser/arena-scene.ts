@@ -5,6 +5,7 @@ import * as Phaser from 'phaser';
 import type { BattleState } from '../../schema/battle-timeline';
 import type { EntityKind, RenderEntity } from '../render-model';
 import type { AnimationIntent } from '../animation-plan';
+import type { BeatBehaviorIntent } from '../beat-behavior';
 import { toRenderModel } from '../render-model';
 import { initialBattleState } from '../../model/battle-model';
 import {
@@ -127,6 +128,18 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayed = [...intents];
     for (const intent of intents) {
       this.runIntent(intent);
+    }
+  }
+
+  // playBeatBehaviors — the BEHAVIOR path (Story 3.3) the adapter's renderBeatBehaviors forwards (a
+  // sibling to playAnimations). Runs a PLACEHOLDER tween/tint per BeatBehaviorIntent on the existing
+  // cast — the polished full-scene cinematics (THUNDORR cutaway, glass-break+record-scratch shatter,
+  // simultaneous-imp-death wave) are Stories 3.4/3.5, NOT built here. Never throws on a well-formed
+  // intent list; an unknown behavior/target is a safe no-op (fail-closed, exactly runIntent's posture).
+  // [story Task 3 "PLACEHOLDER on the existing cast"]
+  playBeatBehaviors(intents: BeatBehaviorIntent[]): void {
+    for (const intent of intents) {
+      this.runBehavior(intent);
     }
   }
 
@@ -287,6 +300,76 @@ export class ArenaScene extends Phaser.Scene {
         return;
       default:
         return;
+    }
+  }
+
+  // ---- the behavior runner (Story 3.3): one placeholder tween/tint per BeatBehaviorIntent ----
+
+  // Run a single behavior intent on the PLACEHOLDER cast. The signature-beat targets (imp/shaman/
+  // mirage/eidolon) have no dedicated display object in v0.1, so they reuse the existing cast as a
+  // placeholder via behaviorTarget(): imp -> minion, shaman/eidolon/boss -> boss, mirage -> minion,
+  // forgemaiden -> forgemaiden. A target with no resolved object is a safe no-op (the lunge/flash/
+  // fadeOut helpers already guard a null display), so an unknown behavior/target never throws
+  // (fail-closed). The polished cinematics are Stories 3.4/3.5. [story Task 3]
+  private runBehavior(intent: BeatBehaviorIntent): void {
+    const target = this.behaviorTarget(intent.target);
+    switch (intent.behavior) {
+      case 'resurrect':
+        // A symptom-imp rises again (placeholder fade/flash on the minion).
+        this.flash(target, intent.durationMs);
+        return;
+      case 'swarm-clear':
+        // All imps die in one wave (placeholder fade-out on the minion stand-in).
+        this.fadeOut(target, intent.durationMs);
+        return;
+      case 'defeat':
+        // The Shaman (root cause) falls (placeholder fade-out on the boss stand-in).
+        this.fadeOut(target, intent.durationMs);
+        return;
+      case 'shatter':
+        // The Mirage shatters (placeholder quick tint+lunge on the stand-in).
+        this.lunge(target, intent.durationMs, 1);
+        this.tint(target, 0x88ccff, intent.durationMs);
+        return;
+      case 'resolve-stagger':
+        // The Hero's self-inflicted recoil CUE — reuse the existing stagger recoil (backward lunge +
+        // red tint). A PRESENTATION cue only; NO Resolve mutation (R1 — the bar moved from Layer-0).
+        this.lunge(target, intent.durationMs, 1, -1);
+        this.tint(target, 0xff5555, intent.durationMs);
+        return;
+      case 'reveal':
+        // The real situation is revealed (placeholder flash on the stand-in).
+        this.flash(target, intent.durationMs);
+        return;
+      case 'summon':
+        // The Eidolon (THUNDORR) is summoned (placeholder flash on the boss stand-in).
+        this.flash(target, intent.durationMs);
+        return;
+      case 'decisive-blow':
+        // The decisive blow dramatizing the breakthrough's integrity damage (placeholder lunge).
+        this.lunge(target, intent.durationMs, 1);
+        return;
+      default:
+        return;
+    }
+  }
+
+  // Map a BeatBehaviorIntent target to an existing-cast AnimTarget the placeholder helpers understand.
+  // The signature-beat creatures have no v0.1 display object; they reuse the placeholder cast until the
+  // 3.4/3.5 cinematics add dedicated objects. An unmapped target resolves to a kind the helpers no-op on.
+  private behaviorTarget(target: BeatBehaviorIntent['target']): AnimationIntent['target'] {
+    switch (target) {
+      case 'forgemaiden':
+        return 'forgemaiden';
+      case 'shaman':
+      case 'eidolon':
+      case 'boss':
+        return 'boss';
+      case 'imp':
+      case 'mirage':
+        return 'minion';
+      default:
+        return 'minion';
     }
   }
 
