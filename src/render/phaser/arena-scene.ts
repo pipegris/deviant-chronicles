@@ -7,6 +7,7 @@ import type { EntityKind, RenderEntity } from '../render-model';
 import type { AnimationIntent } from '../animation-plan';
 import type { BeatBehaviorIntent } from '../beat-behavior';
 import type { CaptionOp } from '../../scribe/captions';
+import type { TeachingOp } from '../../portal/teaching';
 import { toRenderModel } from '../render-model';
 import { initialBattleState } from '../../model/battle-model';
 import {
@@ -136,6 +137,20 @@ export class ArenaScene extends Phaser.Scene {
   // advances no Phaser tweens). [story Task 5]
   private sagaPanel: Phaser.GameObjects.Text | null = null;
 
+  // ---- the always-on teaching banner (Story 4.3, FR-11) ----
+  // The PLAIN-DEV teaching band: ONE Text object near the BOTTOM of the stage (a SECOND band, visually
+  // distinct from + NON-overlapping the Story 4.1 caption band at the top) showing the auto-surfaced
+  // one-liner for the latest signature beat (the teaching SELECTION/text is decided in portal/
+  // teaching.ts; the scene only DISPLAYS it + arms the auto-dismiss). Created hidden in create();
+  // renderTeaching sets its text + reveals it, then arms a delayedCall(dwellMs, hide). Render-side
+  // transient state — never serialized, never pushed upstream (R5/AC1). null until create() builds it.
+  // The plain styling (vs the Tolkien caption band) signals the DIFFERENT register. [story Task 3]
+  private teachingText: Phaser.GameObjects.Text | null = null;
+  // The pending auto-dismiss timer (the latest armed delayedCall). A NEW teach op CANCELS it and arms a
+  // fresh one, so the latest beat's line shows for its FULL dwell instead of being hidden early by a
+  // prior beat's still-pending dismiss. null when no dismiss is pending. [story Task 3]
+  private teachingDismiss: Phaser.Time.TimerEvent | null = null;
+
   constructor() {
     super('Arena');
   }
@@ -201,6 +216,25 @@ export class ArenaScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0.5)
       .setDepth(1000)
+      .setVisible(false);
+
+    // The always-on teaching banner (Story 4.3): a centered Text near the BOTTOM of the stage (y=700,
+    // above the controls), visually DISTINCT from the Tolkien caption band at the top (y=40) so the
+    // plain-dev one-liner does not collide with the mythic caption — a different y AND a plainer style
+    // (a calmer slate-blue on a faint backing) signal the DIFFERENT register. create-ONCE; its text +
+    // visibility mutate in place on renderTeaching, which also arms the auto-dismiss timer. The exact
+    // y/style is operator-tuned; the gate does not assert pixels. [story Task 3; Dev Notes "Placement"]
+    this.teachingText = this.add
+      .text(512, 700, '', {
+        fontSize: '18px',
+        color: '#cfe8ff',
+        align: 'center',
+        wordWrap: { width: 860 },
+        backgroundColor: '#101828cc',
+        padding: { x: 16, y: 8 },
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(900)
       .setVisible(false);
   }
 
@@ -370,6 +404,32 @@ export class ArenaScene extends Phaser.Scene {
   // scroll/typography feel is operator-verified (jsdom advances no tweens). [story Task 5]
   renderSaga(saga: string): void {
     this.sagaPanel?.setText(saga).setVisible(true);
+  }
+
+  // renderTeaching — the TEACHING display path (Story 4.3, FR-11); sibling to renderCaptions/renderSaga.
+  // Shows the banner's line, then arms a wall-clock auto-dismiss for op.dwellMs (this.time.delayedCall).
+  //
+  // WHY last-op-wins: planTeaching may emit >1 op in one transition (a breakthrough co-firing e.g.
+  // dispel + summon — proven in teaching.unit.test.ts), but this ONE shared band can show only one line.
+  // Iterating every op would set-then-immediately-overwrite the earlier lines (each visible ~0ms) and
+  // churn the timer, so we render only the last op — the surviving line gets its full dwell, no flicker
+  // (review F3; stacking distinct lines deferred to Epic 5). Moot on the committed fixture (dispel@Beat0
+  // and shaman@discharge never share a transition), so v0.1 always hands a single op.
+  //
+  // A NEW op cancels the prior pending dismiss so its line shows for the FULL dwell. Fail-closed: an
+  // empty list and a not-yet-started scene are safe no-ops (the ?. guards). Placement/legibility/dismiss
+  // FEEL are operator-verified — jsdom advances no Phaser timer, so the smoke proves the RUN + the arm,
+  // never the dismiss firing. [story Task 3; Dev Notes #4 "render owns the wall-clock dismiss"; review F3]
+  renderTeaching(ops: TeachingOp[]): void {
+    const op = ops[ops.length - 1];
+    if (!op) return;
+    this.teachingText?.setText(op.text).setVisible(true);
+    this.teachingDismiss?.remove(false);
+    this.teachingDismiss =
+      this.time?.delayedCall(op.dwellMs, () => {
+        this.teachingText?.setVisible(false);
+        this.teachingDismiss = null;
+      }) ?? null;
   }
 
   // ---- the cinematic runners (Story 3.4 summon + Story 3.5 shaman/dispel): DRIVEN set-pieces ----

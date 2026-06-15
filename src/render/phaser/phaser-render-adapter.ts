@@ -4,6 +4,7 @@ import * as Phaser from 'phaser';
 import type { BattleState, Beat } from '../../schema/battle-timeline';
 import type { AnnotatedView } from '../../interpret/overlay';
 import type { CaptionOp } from '../../scribe/captions';
+import type { TeachingOp } from '../../portal/teaching';
 import type { RenderPort } from '../render-port';
 import { planAnimations } from '../animation-plan';
 import { planBeatBehaviors } from '../beat-behavior';
@@ -202,6 +203,18 @@ export class PhaserRenderAdapter implements RenderPort {
   renderSaga(saga: string): void {
     const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
     if (scene) scene.renderSaga(saga);
+  }
+
+  // The TEACHING command (Story 4.3, FR-11): auto-surface the always-on plain-dev one-liner(s) on the
+  // scene's teaching banner. Forwarded to ArenaScene.renderTeaching (which sets the band text + shows it
+  // + arms the wall-clock auto-dismiss). The teaching SELECTION/text was decided in portal/teaching.ts;
+  // this only DISPLAYS it. A no-op if the scene is still booting (never throws — the ready-guard, the
+  // renderCaptions precedent). One-way — nothing flows back upstream (R5/AC1). [story Task 3]
+  renderTeaching(ops: TeachingOp[]): void {
+    const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) scene.renderTeaching(ops);
+    // else: still booting — teaching is PRESENTATION; drop it (no upstream effect). Never buffer stale
+    // narration that would auto-surface out of context once boot finishes.
   }
 
   // The read-only cinematic QUERY (Story 3.4 fix F1/F2): false before boot. The boot polls this so the

@@ -19,6 +19,8 @@ import { planBeatBehaviors } from './beat-behavior';
 import type { BeatSignal } from '../interpret/beat-signal';
 import { planCaptions, planCaptionCorrection } from '../scribe/captions';
 import type { CaptionOp } from '../scribe/captions';
+import { planTeaching } from '../portal/teaching';
+import type { TeachingOp } from '../portal/teaching';
 import { readSaga } from '../scribe/saga';
 import type { ReplayBundle } from '../schema/replay-bundle';
 
@@ -291,6 +293,17 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     const emits = captionOps.filter((o): o is Extract<CaptionOp, { kind: 'emit' }> => o.kind === 'emit');
     captionHistory.push(...emits);
     if (captionOps.length > 0) adapter.renderCaptions?.(captionOps);
+    // The TEACHING path (Story 4.3, FR-11) rides the SAME forward transition: the PURE planTeaching
+    // emits at most one plain-dev one-liner op per signature beatType firing in this transition (dispel
+    // on the dispel-tagged beat, shaman on the breakthrough-discharge death; summon is dormant-in-
+    // fixture). Hand any ops to the adapter to AUTO-surface the lesson with NO viewer action — there is
+    // no toggle/click/open() on this path, the boot pushes the op on the tick (AC1). UNLIKE captions,
+    // teaching needs NO boot-owned history (it is stateless per-transition — the lesson is fixed, never
+    // corrected). Only the forward tick drives this; seek/restart SNAP via render() (you cannot
+    // auto-surface a lesson across a jump) and never reach here; the held-frame tick passes an empty
+    // beatsAdvanced so planTeaching returns [] (nothing to surface). [story Task 4]
+    const teachingOps: TeachingOp[] = planTeaching(prev, state.battleState, beatsAdvanced, view);
+    if (teachingOps.length > 0) adapter.renderTeaching?.(teachingOps);
     const { signals } = planBeatBehaviors(prev, state.battleState, beatsAdvanced, view);
     for (const signal of signals) onSignal(signal);
     // The SAGA path (Story 4.2, FR-10): at the victory MILESTONE, hand the pre-generated closing Saga

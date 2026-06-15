@@ -1,6 +1,7 @@
 import type { BattleState, Beat } from '../schema/battle-timeline';
 import type { AnnotatedView } from '../interpret/overlay';
 import type { CaptionOp } from '../scribe/captions';
+import type { TeachingOp } from '../portal/teaching';
 
 // render-port — the ONE-WAY RenderPort interface (FR-7, R5): the swap seam. It imports BattleState
 // (and Beat) as a TYPE and imports NO phaser, so it is renderer-agnostic — swapping Phaser for
@@ -70,6 +71,17 @@ export interface RenderPort {
   // extension stays BACKWARD-COMPATIBLE (a pre-4.2 fake adapter still satisfies RenderPort; the boot
   // guards the call), exactly the renderCaptions? / renderBeatBehaviors? precedent. [story Task 4]
   renderSaga?(saga: string): void;
+  // The TEACHING path (Story 4.3, FR-11): auto-surface the always-on plain-dev one-liner(s) for a
+  // transition — a `teach` op sets the teaching banner's text + shows it, and the scene arms a
+  // wall-clock auto-dismiss timer for the op's dwellMs (the banner hides itself after the dwell, no
+  // viewer action). The teaching SELECTION/text is decided in Layer-2/portal (portal/teaching.ts); this
+  // command only DISPLAYS it. One-way like the other commands: it returns void and pushes NOTHING back
+  // upstream (R5/AC1). `TeachingOp` is a TYPE-only import (render -> portal is allowed — there is no
+  // lint zone forbidding it, and render/ already imports interpret/ + scribe/; TeachingOp is a plain
+  // type so nothing leaks). OPTIONAL (`?`) so the additive extension stays BACKWARD-COMPATIBLE (a pre-
+  // 4.3 fake adapter still satisfies RenderPort; the boot guards the call), exactly the renderCaptions?
+  // / renderSaga? precedent. [story Task 3; Dev Notes "Wire the one-way display seam"]
+  renderTeaching?(ops: TeachingOp[]): void;
   // The lone read-only QUERY on this otherwise one-way command interface (Story 3.4 fix F1/F2): is the
   // renderer's cinematic mid-play? The scene's cinematic machine is the single source of truth for when
   // the cutaway reaches `done`; the boot OBSERVES this to suspend/resume the forward tick (it pushes
