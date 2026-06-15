@@ -194,6 +194,16 @@ export class PhaserRenderAdapter implements RenderPort {
     // is the truth). Never buffer stale narration that would play out of sync once boot finishes.
   }
 
+  // The SAGA command (Story 4.2, FR-10): display the pre-generated closing Saga on the scene's victory
+  // panel. Forwarded to ArenaScene.renderSaga (the boot fires it once at the victory milestone). The
+  // Saga prose was read in Layer 2 (scribe/saga.ts); this only DISPLAYS it. A no-op if the scene is
+  // still booting (the victory milestone arrives long after boot, so this is not a real drop path; the
+  // guard keeps it from throwing). One-way — nothing flows back upstream (R5/AC1). [story Task 5]
+  renderSaga(saga: string): void {
+    const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) scene.renderSaga(saga);
+  }
+
   // The read-only cinematic QUERY (Story 3.4 fix F1/F2): false before boot. The boot polls this so the
   // scene's cinematic machine is the single source of truth for the suspend-guard — letting the boot
   // resume the forward tick when the cutaway reaches `done`. [review F1/F2]

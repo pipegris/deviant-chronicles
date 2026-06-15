@@ -128,6 +128,14 @@ export class ArenaScene extends Phaser.Scene {
   private currentCaptionText = '';
   private readonly captionTextById = new Map<string, string>();
 
+  // ---- the closing Saga victory panel (Story 4.2, FR-10) ----
+  // The lush closing Saga shown at the victory milestone: ONE centered, multi-line Text panel (the
+  // prose comes from Layer 2 scribe/saga.ts; the scene only DISPLAYS it). Created hidden in create();
+  // renderSaga sets its text + reveals it. Render-side transient state — never serialized, never pushed
+  // upstream (R5/AC1). The on-screen legibility/typography is the operator-verified visual (jsdom
+  // advances no Phaser tweens). [story Task 5]
+  private sagaPanel: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super('Arena');
   }
@@ -175,6 +183,24 @@ export class ArenaScene extends Phaser.Scene {
     this.captionRewrite = this.add
       .text(512, 78, '', { fontSize: '20px', color: '#ffd54f', align: 'center', wordWrap: { width: 900 } })
       .setOrigin(0.5, 0)
+      .setVisible(false);
+
+    // The closing Saga victory panel (Story 4.2): a centered, multi-line lush-prose Text near the
+    // middle of the stage, hidden until the victory milestone fires renderSaga. create-ONCE; its text
+    // and visibility mutate in place. The `add.text` precedent is the caption band + the gauge label.
+    // [story Task 5]
+    this.sagaPanel = this.add
+      .text(512, 384, '', {
+        fontSize: '22px',
+        color: '#f5e8c8',
+        align: 'center',
+        fontStyle: 'italic',
+        wordWrap: { width: 760 },
+        backgroundColor: '#0d0d1acc',
+        padding: { x: 24, y: 20 },
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(1000)
       .setVisible(false);
   }
 
@@ -335,6 +361,15 @@ export class ArenaScene extends Phaser.Scene {
         this.currentCaptionText = op.newText;
       }
     }
+  }
+
+  // renderSaga — the SAGA path (Story 4.2, FR-10) the adapter's renderSaga forwards: reveal the lush
+  // closing Saga on the victory panel. The boot fires it ONCE at the victory milestone (the prose was
+  // read in Layer 2 by scribe/saga.ts; this only DISPLAYS it). Sets the panel text and makes it
+  // visible. Never throws on a well-formed string (fail-closed: a missing panel is a safe no-op). The
+  // scroll/typography feel is operator-verified (jsdom advances no tweens). [story Task 5]
+  renderSaga(saga: string): void {
+    this.sagaPanel?.setText(saga).setVisible(true);
   }
 
   // ---- the cinematic runners (Story 3.4 summon + Story 3.5 shaman/dispel): DRIVEN set-pieces ----

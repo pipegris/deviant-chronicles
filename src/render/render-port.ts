@@ -62,6 +62,14 @@ export interface RenderPort {
   // BACKWARD-COMPATIBLE (a pre-4.1 fake adapter still satisfies RenderPort; the boot guards the call),
   // exactly the renderBeatBehaviors? precedent. [story Task 5; Dev Notes "Where CaptionOp lives"]
   renderCaptions?(ops: CaptionOp[]): void;
+  // The SAGA path (Story 4.2, FR-10): display the pre-generated closing Saga at the victory milestone —
+  // the boot fires this ONCE at the BattleState.victory false->true edge. It takes the Saga STRING (the
+  // SDK-free reader's output, scribe/saga.ts), NOT the bundle, keeping the interface renderer-agnostic.
+  // One-way like the other commands: it returns void and pushes NOTHING back upstream (R5/AC1) — the
+  // Saga is Layer-2 prose that makes no truth claim feeding mechanics. OPTIONAL (`?`) so the additive
+  // extension stays BACKWARD-COMPATIBLE (a pre-4.2 fake adapter still satisfies RenderPort; the boot
+  // guards the call), exactly the renderCaptions? / renderBeatBehaviors? precedent. [story Task 4]
+  renderSaga?(saga: string): void;
   // The lone read-only QUERY on this otherwise one-way command interface (Story 3.4 fix F1/F2): is the
   // renderer's cinematic mid-play? The scene's cinematic machine is the single source of truth for when
   // the cutaway reaches `done`; the boot OBSERVES this to suspend/resume the forward tick (it pushes

@@ -1,0 +1,75 @@
+// OFFLINE OPERATOR STEP — requires ANTHROPIC_API_KEY (see .env.example); NOT run in dev/CI.
+// The browser reader is src/scribe/saga.ts (SDK-free). This is the thin argv/fs/stdout glue for the
+// DEFERRED real bake (Epic 5 / Story 5.2 bundle assembly): it runs the real SagaAuthor over a
+// session's NormalizedEvent[], authors ONE lush Tolkien-register Saga via claude-opus-4-8, and writes
+// the Saga text to disk as the artifact Story 5.2 folds into ReplayBundle.saga.
+//
+// ALL testable logic lives in src/scribe/saga-author.ts (which `pnpm test` runs); this file carries
+// no logic worth a unit test. Re-running is an explicit manual step, never CI. Usage:
+//   jiti scripts/scribe-saga.ts --transcript <path> --journal <path> --stream-id <id> \
+//     --out <path> [--model claude-opus-4-8] [--prompt-version <v>]
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parseTranscript } from '../src/ingest/parse-transcript';
+import { parseJournal } from '../src/ingest/parse-journal';
+import { normalizeTranscript, normalizeJournal } from '../src/ingest/normalize';
+import { mergeStreams } from '../src/ingest/merge';
+import { SagaAuthor } from '../src/scribe/saga-author';
+
+function getFlag(argv: string[], name: string): string | undefined {
+  const i = argv.indexOf(`--${name}`);
+  return i >= 0 && i + 1 < argv.length ? argv[i + 1] : undefined;
+}
+
+function requireFlag(argv: string[], name: string): string {
+  const value = getFlag(argv, name);
+  if (value === undefined) {
+    throw new Error(`scripts/scribe-saga.ts: missing required --${name} flag.`);
+  }
+  return value;
+}
+
+async function main(argv: string[]): Promise<void> {
+  const transcriptPath = requireFlag(argv, 'transcript');
+  const journalPath = requireFlag(argv, 'journal');
+  const streamId = requireFlag(argv, 'stream-id');
+  const outPath = requireFlag(argv, 'out');
+  const model = getFlag(argv, 'model');
+  const promptVersion = getFlag(argv, 'prompt-version');
+
+  // Anti-corruption: ingest parses + Zod-validates the raw JSONL; the author consumes the validated
+  // NormalizedEvent[] only (R3). Journal events are sequenced just after the dev stream. This is the
+  // SAME ingest path as scripts/interpret.ts — the Saga window is the full validated event set.
+  const transcript = normalizeTranscript(
+    parseTranscript(readFileSync(transcriptPath, 'utf8'), streamId),
+    streamId,
+  );
+  const devMaxEpoch = Math.max(
+    ...transcript.map((e) => Date.parse(e.timestamp)).filter((n) => !Number.isNaN(n)),
+  );
+  const journal = normalizeJournal(parseJournal(readFileSync(journalPath, 'utf8')), devMaxEpoch + 1);
+  const events = mergeStreams([transcript, journal]);
+
+  // No injected client → SagaAuthor lazily constructs the real SDK client (reads ANTHROPIC_API_KEY
+  // from env). THIS is the single real call — the deferred operator step.
+  const author = new SagaAuthor({ model, promptVersion });
+  // Loud heads-up before the lazy `new Anthropic()` — this is a real, BILLED Anthropic call (F6).
+  process.stderr.write(
+    `scripts/scribe-saga.ts: about to make a REAL, BILLED Anthropic call (model ${model ?? 'claude-opus-4-8'}) ` +
+      'over the resolved ANTHROPIC_API_KEY — the deferred operator bake, never run in dev/CI.\n',
+  );
+  const saga = await author.authorSaga(events);
+
+  // Write the Saga text as the artifact Story 5.2 folds into ReplayBundle.saga. JSON-stringify the
+  // bare string so the on-disk form round-trips byte-stable into the bundle field (a plain string).
+  writeFileSync(outPath, `${JSON.stringify(saga, null, 2)}\n`, 'utf8');
+  process.stdout.write(`Wrote a ${saga.length}-char Saga (prompt ${author.promptVersion}) to ${outPath}\n`);
+}
+
+// Run only when invoked directly (never on import). Tests never import this file.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main(process.argv.slice(2)).catch((err: unknown) => {
+    process.stderr.write(`${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+    process.exitCode = 1;
+  });
+}

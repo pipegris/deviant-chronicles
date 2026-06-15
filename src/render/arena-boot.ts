@@ -19,6 +19,8 @@ import { planBeatBehaviors } from './beat-behavior';
 import type { BeatSignal } from '../interpret/beat-signal';
 import { planCaptions, planCaptionCorrection } from '../scribe/captions';
 import type { CaptionOp } from '../scribe/captions';
+import { readSaga } from '../scribe/saga';
+import type { ReplayBundle } from '../schema/replay-bundle';
 
 // arena-boot — wires the Story 2.2 playback reducer to the RenderPort adapter AND the Story 2.5
 // on-screen CONTROLS. The boot OWNS the reducer state + adapter + controls (one-way: controls
@@ -59,6 +61,17 @@ function deriveTimeline(): { timeline: BattleTimeline; events: NormalizedEvent[]
 export type BootDeps = {
   createAdapter?: (parent: string) => RenderPort;
   onSignal?: (signal: BeatSignal) => void;
+  // Story 4.2 — the Saga seam. The boot shows the pre-generated closing Saga at the victory milestone;
+  // it sources the Saga from the SDK-free reader (readSaga). On the dev/CI FIXTURE path there is NO
+  // ReplayBundle loaded yet (bundle loading is Story 5.2), so neither dep is set and the resolved Saga
+  // is null — the victory wiring then has nothing to show (the documented fail-closed-to-default
+  // posture; the live dev panel is dormant until Epic 5 bakes the Saga and 5.2 loads the bundle, the
+  // SAME dormant-in-fixture reality as summon@3.4). `bundle` is the Story-5.2 path: readSaga(bundle)
+  // returns the baked prose and the SAME wiring lights up unchanged. `saga` is the resolved-string
+  // override (a test injection / the dev-preview hook), taking precedence so a panel can be exercised
+  // without a full bundle. [story Task 4 "the boot passes the Saga it has"]
+  saga?: string | null;
+  bundle?: ReplayBundle;
 };
 
 // The drivable boot handle: the live state/adapter/controls plus the two seams the headless test
@@ -125,6 +138,21 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
   // captions (you cannot narrate across a jump — same posture as the behavior path), so the history
   // grows ONLY on the forward tick. [story Task 4]
   const captionHistory: Extract<CaptionOp, { kind: 'emit' }>[] = [];
+
+  // Story 4.2 — resolve the closing Saga string ONCE at boot via the SDK-free reader. Precedence: an
+  // explicit resolved-string `deps.saga` (a test injection / the dev-preview hook) wins; else read it
+  // from a loaded `deps.bundle` (the Story-5.2 path); else null (the bundle-less dev/CI fixture path).
+  // readSaga is the only Saga source the boot touches — the browser path stays offline-at-replay
+  // (no LLM/SDK; saga-author.ts is never imported here). [story Task 4]
+  const saga: string | null =
+    deps.saga !== undefined ? deps.saga : deps.bundle ? readSaga(deps.bundle) : null;
+  // The boot-owned `sagaShown` guard: render-side TRANSIENT state (the captionHistory/cinematicActive
+  // precedent) — never in the reducer, never serialized. Latches true when the Saga is shown at the
+  // victory edge so a re-render / a later clamped tick does not re-narrate the milestone. It is
+  // ONCE-PER-SESSION by design and is deliberately NOT reset on restart (mirroring captionHistory,
+  // which also never resets): the closing Saga is the milestone's one-time elegiac payoff, not a
+  // per-replay cue, so a play→victory→restart→replay does not re-fire it. [story Task 4; review F2]
+  let sagaShown = false;
 
   // onSignal — the boot's signal handler (Story 4.1). Forward every signal to the injected sink, THEN,
   // for a scribe-correction signal (the Dispel honesty beat), resolve the `correct` op against the
@@ -265,6 +293,18 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     if (captionOps.length > 0) adapter.renderCaptions?.(captionOps);
     const { signals } = planBeatBehaviors(prev, state.battleState, beatsAdvanced, view);
     for (const signal of signals) onSignal(signal);
+    // The SAGA path (Story 4.2, FR-10): at the victory MILESTONE, hand the pre-generated closing Saga
+    // to the adapter ONCE. The trigger is the BattleState.victory latch flipping false->true on THIS
+    // forward transition (battle-model.ts latches victory = victory || problemIntegrity <= 0 — sticky/
+    // idempotent once true). The sagaShown guard makes it fire at most once (a later clamped tick after
+    // victory does not re-narrate). Only the forward tick reaches here; seek/restart SNAP and never fire
+    // it — you cannot narrate a milestone across a jump (the caption-path posture). A null Saga (the
+    // bundle-less fixture path) means nothing to show — guard on it so the panel simply stays dormant.
+    // [story Task 4; src/model/battle-model.ts L89-90 the victory latch]
+    if (!sagaShown && prev.victory === false && state.battleState.victory === true && saga !== null) {
+      sagaShown = true;
+      adapter.renderSaga?.(saga);
+    }
     controls.sync();
   };
 

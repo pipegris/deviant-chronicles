@@ -20,7 +20,12 @@ import { describe, expect, it } from 'vitest';
 const SCRIBE = dirname(fileURLToPath(import.meta.url));
 
 // The Layer-2 narration core — the modules that MUST stay SDK-free AND phaser-free.
-const SCRIBE_MODULES = ['captions.ts', 'captions-config.ts'];
+// Story 4.2 adds `saga.ts` (the SDK-free browser-reachable Saga READER) to this guard: it ships in
+// the bundle, so it must import no SDK + no phaser, exactly like the caption core. It is the READER
+// only — do NOT add `saga-author.ts` here: that module is SUPPOSED to import @anthropic-ai/sdk
+// (R4-allowed in scribe/, browser-UNREACHABLE, tree-shaken). The primary R4 proof for the author is
+// the dist-grep + the browser-entry never importing it. [story Task 5 "add 'saga.ts' to SCRIBE_MODULES"]
+const SCRIBE_MODULES = ['captions.ts', 'captions-config.ts', 'saga.ts'];
 
 describe('Story 4.1 (R4) — scribe/ caption core imports no @anthropic-ai/sdk (templated, no LLM)', () => {
   for (const file of SCRIBE_MODULES) {

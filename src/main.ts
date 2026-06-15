@@ -4,8 +4,25 @@ import { startArena } from './render/arena-boot';
 // the template's "Make something fun!" demo scene. The Anthropic SDK is NOT on this path (R4 — the
 // browser entry never imports @anthropic-ai/sdk). The old template bootstrap (src/game/main.ts +
 // its demo scenes) is left in place but unused.
+// A canned dev Saga so the operator can WATCH the victory panel during `pnpm dev` BEFORE the real
+// claude-opus-4-8 bake (the deferred Epic-5 operator step). It is NOT a real bundle — the production
+// browser path carries no baked Saga yet (Story 5.2 loads the bundle), so the live victory panel is
+// otherwise dormant (the SAME dormant-in-fixture reality as the summon cinematic). [story Task 4]
+const DEV_PREVIEW_SAGA =
+  'And in the last hour the Forgemaiden raised her hammer against the Hanging Curse of the Endless ' +
+  'Wait; the kingdom held its breath, and when the curse was bound at last she cried across the ' +
+  'smoking field: "By hammer and hash, it is done!"';
+
 document.addEventListener('DOMContentLoaded', () => {
-  const handle = startArena('game-container');
+  // The DEV-ONLY ?saga preview (Story 4.2): when present, thread a canned dev Saga into the boot so the
+  // operator can watch the victory panel render at the milestone during `pnpm dev`. GUARDED by
+  // import.meta.env.DEV: Vite statically replaces it with `false` in `build`, so this branch (and the
+  // canned string's only use) dead-code-eliminates from the production bundle — no dev Saga ships. It
+  // injects NO real bundle and does NOT alter the production path (which carries a null Saga until
+  // Story 5.2). The SAME ?cinematic= DCE-preview precedent. [story Task 4 §"Operator-verifying the panel"]
+  const wantSagaPreview =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).get('saga') !== null;
+  const handle = startArena('game-container', wantSagaPreview ? { saga: DEV_PREVIEW_SAGA } : {});
 
   // The DEV-ONLY preview triggers (Story 3.4 summon + Story 3.5 shaman/dispel). The `?cinematic=` URL
   // flag plays a signature cinematic on demand so the operator can WATCH it. `summon` is omitted from
