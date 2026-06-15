@@ -1,7 +1,8 @@
 generated: 2026-06-14
-last_updated: 2026-06-14
+last_updated: 2026-06-14T19:26:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
+# 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
 project: dev-chronicles
 # Epic 1 — The Deterministic Battle Core
 development_status:
@@ -13,7 +14,7 @@ development_status:
   1-5: done
   # Epic 2 — The Playable Arena (Battle Model + Renderer)
   epic-2: in-progress
-  2-1: backlog
+  2-1: done
   2-2: backlog
   2-3: backlog
   2-4: backlog

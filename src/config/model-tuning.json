@@ -1,0 +1,7 @@
+{
+  "$schemaVersion": 1,
+  "initial": { "problemIntegrity": 100, "resolve": 100 },
+  "insight": { "maxGauge": 100, "chargePerStruggle": 60, "dischargeThreshold": 50 },
+  "boss": { "id": "boss", "type": "feature", "hp": 100 },
+  "effects": { "integrityDamagePerWeight": 1.0, "resolveDrainPerWeight": 1.0 }
+}
