@@ -1,9 +1,10 @@
 generated: 2026-06-14
-last_updated: 2026-06-14T20:18:00Z
+last_updated: 2026-06-14T22:00:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
 # 2-2 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1: floored + finiteness-guarded the cursor/speed clamps, F1+F2). The deterministic playback reducer (FR-6) wrapping Story 2.1's foldBattleState; epic-2 stays in-progress.
+# 2-3 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). First RENDERER story (FR-7, R5): the one-way RenderPort seam + pure RenderModel + Phaser arena drawing placeholders, driven by the Story 2.2 reducer. NOT animations (2.4) or controls UI (2.5). epic-2 stays in-progress. Gate-verified: AC1 + testable half of AC2 (pure RenderModel, one-way fake-adapter contract, headless Phaser boot smoke + HEADLESS adapter test). Fix round 1: fixed a real adapter readiness defect (playback now reaches the arena), F2/F3/F4 fixed, F5 doc counts corrected, F1/F6/F7/F8 refuted. AC2 visual appearance remains operator-verified (pnpm dev).
 project: dev-chronicles
 # Epic 1 — The Deterministic Battle Core
 development_status:
@@ -17,6 +18,6 @@ development_status:
   epic-2: in-progress
   2-1: done
   2-2: done
-  2-3: backlog
+  2-3: done
   2-4: backlog
   2-5: backlog
