@@ -75,6 +75,15 @@ export type ArenaHandle = {
   // production overlay. main.ts calls it behind import.meta.env.DEV (?cinematic=summon) — tree-shaken
   // from the prod build. [story Task 3]
   previewSummonCinematic: () => void;
+  // Story 3.5: the DEV-ONLY replay hooks for the shaman swarm-clear / dispel shatter cinematics. UNLIKE
+  // summon (omitted from the committed fixture, so its dev preview is the ONLY way to see it), BOTH of
+  // these DO fire on the committed fixture during normal playback — so these hooks are an operator
+  // REPLAY-ON-DEMAND convenience (re-watch a set-piece without scrubbing to the exact beat), NOT the only
+  // path. Each plays its cinematic over the CURRENT state.battleState and clean-returns to it via the
+  // SNAP path. main.ts calls them behind import.meta.env.DEV (?cinematic=shaman / ?cinematic=dispel) —
+  // tree-shaken from the prod build. They inject NO fake annotation into the production overlay. [story Task 4]
+  previewShamanCinematic: () => void;
+  previewDispelCinematic: () => void;
   // True while the cinematic plays — render-side TRANSIENT state (the rafId precedent), NOT playback
   // state (never serialized, never in the reducer). advanceIfPlaying reads it to SUSPEND the forward
   // tick mid-cutaway (Task 2 option A: paused-in-place, so resume is trivially clean). [story Task 2]
@@ -152,6 +161,25 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     cinematicActive = true;
     adapter.render(state.battleState); // clean-return baseline: restore the reducer's snapshot (R1)
     adapter.previewSummonCinematic?.(state.battleState);
+  };
+
+  // Story 3.5 — the DEV-ONLY replay hooks for the shaman/dispel cinematics. SAME shape as
+  // previewSummonCinematic (the guard + clean-return baseline are REUSED unchanged): mark the cinematic
+  // active (advanceIfPlaying then suspends the forward tick), re-apply the CURRENT snapshot via the SNAP
+  // path (the clean-return baseline — RESTORE the reducer's foldBattleState truth, never recompute, R1),
+  // and drive the real scene's cinematic via the optional one-way command (a no-op on a fake adapter
+  // lacking it). They do NOT inject a fake annotation into the production overlay — the cinematic is
+  // played DIRECTLY over the current snapshot. [story Task 4 §"dev-preview"; Dev Notes §"Dev-only preview"]
+  const previewShamanCinematic = (): void => {
+    cinematicActive = true;
+    adapter.render(state.battleState);
+    adapter.previewShamanCinematic?.(state.battleState);
+  };
+
+  const previewDispelCinematic = (): void => {
+    cinematicActive = true;
+    adapter.render(state.battleState);
+    adapter.previewDispelCinematic?.(state.battleState);
   };
 
   // One loop step, gated on status: advance the cursor by `state.speed` and ANIMATE the transition
@@ -255,6 +283,8 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
     advanceIfPlaying,
     getState: () => state,
     previewSummonCinematic,
+    previewShamanCinematic,
+    previewDispelCinematic,
     isCinematicActive,
     destroy,
   };

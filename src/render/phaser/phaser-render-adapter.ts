@@ -129,7 +129,10 @@ export class PhaserRenderAdapter implements RenderPort {
     }
     const scene = this.ready ? (this.game.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
     if (scene) {
-      scene.playBeatBehaviors(planBeatBehaviors(prev, next, beats, view).intents);
+      // Thread `next` as the arm-snapshot so a cinematic that arms on this forward transition pins the
+      // foldBattleState truth for the armed cursor as its clean-return snapshot — NOT the stale t=0 frame
+      // (the forward tick never calls applySnapshot). [review H1]
+      scene.playBeatBehaviors(planBeatBehaviors(prev, next, beats, view).intents, next);
     }
     // else: still booting — drop the behavior (presentation only; the next snapshot is snapped via the
     // existing pending flush). No buffering of motion that would play stale once boot finishes.
@@ -148,6 +151,32 @@ export class PhaserRenderAdapter implements RenderPort {
     const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
     if (scene) {
       scene.playBeatBehaviors([{ target: 'eidolon', behavior: 'summon', durationMs: 0 }]);
+    }
+  }
+
+  // The DEV-ONLY preview commands (Story 3.5): drive the live scene's shaman swarm-clear / dispel
+  // shatter cinematic on demand so the operator can RE-WATCH each set-piece without scrubbing to the
+  // exact beat (UNLIKE 3.4's summon, these DO fire on the committed fixture during normal playback — so
+  // these hooks are a replay-on-demand convenience, not the only path). main.ts gates them behind
+  // import.meta.env.DEV via ?cinematic=shaman / ?cinematic=dispel (tree-shaken from prod). Each plays
+  // the cinematic DIRECTLY by handing the scene the SAME production trigger intent — it does NOT touch
+  // the read-only overlay / FixtureInterpreter (no fake annotation enters the production path). The
+  // snapshot the clean return restores is already captured by the scene (its last applySnapshot); the
+  // boot also re-applies it via render() as the clean-return baseline. A no-op if the scene is still
+  // booting (never throws). One-way — nothing flows back upstream (R5/AC1). [story Task 4 §"dev-preview"]
+  previewShamanCinematic(_snapshot: BattleState): void {
+    void _snapshot; // the scene restores its own captured snapshot on `done`; the boot snaps the baseline
+    const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) {
+      scene.playBeatBehaviors([{ target: 'shaman', behavior: 'defeat', durationMs: 0 }]);
+    }
+  }
+
+  previewDispelCinematic(_snapshot: BattleState): void {
+    void _snapshot; // the scene restores its own captured snapshot on `done`; the boot snaps the baseline
+    const scene = this.ready ? (this.game?.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) {
+      scene.playBeatBehaviors([{ target: 'mirage', behavior: 'shatter', durationMs: 0 }]);
     }
   }
 

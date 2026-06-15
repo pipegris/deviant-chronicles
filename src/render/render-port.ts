@@ -42,6 +42,15 @@ export interface RenderPort {
   // the boot guards the call). The real PhaserRenderAdapter drives the scene's cinematic; main.ts gates
   // the boot hook behind import.meta.env.DEV so this never runs in production. [story Task 3]
   previewSummonCinematic?(snapshot: BattleState): void;
+  // The DEV-ONLY preview commands (Story 3.5): play the shaman swarm-clear / dispel shatter cinematic on
+  // demand over `snapshot` so the operator can re-watch each set-piece (UNLIKE summon, both DO fire on
+  // the committed fixture during normal playback — these are a replay-on-demand convenience). One-way
+  // like the other commands — they return void and push NOTHING back upstream. OPTIONAL (`?`) so the
+  // additive extension stays BACKWARD-COMPATIBLE (a fake adapter without them still satisfies RenderPort;
+  // the boot guards the call). The real PhaserRenderAdapter drives the scene's cinematic; main.ts gates
+  // the boot hooks behind import.meta.env.DEV so these never run in production. [story Task 4]
+  previewShamanCinematic?(snapshot: BattleState): void;
+  previewDispelCinematic?(snapshot: BattleState): void;
   // The lone read-only QUERY on this otherwise one-way command interface (Story 3.4 fix F1/F2): is the
   // renderer's cinematic mid-play? The scene's cinematic machine is the single source of truth for when
   // the cutaway reaches `done`; the boot OBSERVES this to suspend/resume the forward tick (it pushes

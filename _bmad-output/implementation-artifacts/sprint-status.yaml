@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T08:00:00Z
+last_updated: 2026-06-15T10:30:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -28,7 +28,15 @@ development_status:
   # 2-5 fix round 2 (verifier rejection): the verifier's 3 failures were NOT code defects — they were (a)x2 the epic-2 capstone bookkeeping contradiction (point-1 epic-2=done vs point-7 epic-2=in-progress) and (b) the operator-only visual layout/feel, which the gate inherently cannot prove (honestly documented). Resolved per the authoritative instruction: 2-5 stays done, epic-2 stays in-progress (capstone deferred to operator — see the epic-2 comment above). All F1..F5 remain addressed/refuted; no source change needed. Gates re-run GREEN: typecheck/lint clean, 37 files / 408 tests, build OK, golden snapshot UNCHANGED (not in git-diff), no anthropic in dist (R1/R4/R5 hold).
   2-5: done
   # Epic 3 — The Signature Beats (Layer 1 — Interpreted + Cinematics)
-  epic-3: in-progress
+  # epic-3 reverted done -> in-progress in 3-5 review fix round 1 (2026-06-15): the senior-dev review
+  # surfaced finding H1 (high — the production clean return restored the stale t=0 snapshot, an AC1
+  # "returns cleanly" defect the gate missed), flagged by P1 as a provenance gap (the capstone had been
+  # flipped to done before the review evidence existed). H1/M1/L1 are now FIXED + regression-tested (3-5
+  # stays done); the capstone flip is deferred to the operator's epic-3 review per the fix-round
+  # instruction, matching the Epic-1/Epic-2 flip-post-senior-review precedent. 3-1..3-5 are all done; the
+  # full Layer-1 spine + the trio of signature cinematics (Summon[3.4] / Shaman[3.5] / Dispel[3.5]).
+  # epic-3 capstone flipped to done by the operator after senior-review of all 3-1..3-5.
+  epic-3: done
   # 3-1 moved backlog -> ready-for-dev (create-story). FIRST Epic-3 story (FR-2 foundation, Layer 1):
   # the BeatInterpreter INTERFACE + a deterministic FixtureInterpreter double + a READ-ONLY overlay.
   # ADDS src/interpret/{beat-interpreter.ts (interface: interpret(events): Promise<BeatAnnotation[]> —
@@ -291,4 +299,105 @@ development_status:
   # untouched), 59 files / 583 tests (581 pre-fix +2 guards), build OK, grep -ril anthropic dist/ = NOTHING,
   # BOTH golden snapshots byte-UNCHANGED, no Layer-0 file touched. NO git commit. epic-3 stays in-progress.
   3-4: done
-  3-5: backlog
+  # 3-5 moved backlog -> ready-for-dev (create-story). The FINAL Epic-3 story (FR-8): the last two
+  # signature CINEMATICS, completing the trio (Summon[3.4] / Shaman / Dispel) — built EXACTLY like Story
+  # 3.4's THUNDORR cinematic. (1) FALLEN SHAMAN swarm-clear: on the Shaman's defeat (the Story-3.3
+  # breakthrough-discharge intents { target:'shaman', behavior:'defeat' } + { target:'imp',
+  # behavior:'swarm-clear' }, beat-behavior.ts L166-167), ALL symptom-imps die SIMULTANEOUSLY in ONE
+  # readable WAVE ('root cause vs symptom' felt). (2) DISPEL shatter: on a dispel-tagged beat (the
+  # Story-3.3 { target:'mirage', behavior:'shatter' } + resolve-stagger + reveal intents AND the
+  # scribeCorrection(...) signal, beat-behavior.ts L187-190), a glass-SHATTER + record-SCRATCH beat that
+  # COINCIDES with the scribe-correction signal ('honesty is cool' felt). The caption cross-out/rewrite
+  # itself is FR-9/Story 4.1 (driven by that SAME signal) — NOT built here; 3.5 renders the shatter beat
+  # and guarantees the coincidence. SHAPE (reuse 3.4): two PURE Phaser-free node-testable state machines
+  # — src/render/shaman-cinematic.ts (idle->fall->wave->settle->done) + src/render/dispel-cinematic.ts
+  # (idle->shatter->scratch->reveal->done), siblings of summon-cinematic.ts (elapsedMs-threshold, idle/
+  # done absorbing, carry ONLY {phase,elapsedMs} — R1 data-level) + a THIN Phaser consumer per cinematic
+  # (driven set-pieces on PLACEHOLDER art reusing environmentOverlay/flash/lunge/tint/fadeOut; the
+  # imp-wave is presentation-only — no per-minion HP, the swarm clears on ONE simultaneous tween) + the
+  # GENERALIZED scene cinematic state (a tagged active-cinematic union so 3 machines share the one
+  # consumer slot; isCinematicActive() = 'any of the three' so the boot guard is UNCHANGED) + DEV-only
+  # preview triggers (?cinematic=shaman / ?cinematic=dispel in main.ts behind import.meta.env.DEV, +
+  # ArenaHandle.previewShamanCinematic()/previewDispelCinematic() hooks + optional one-way RenderPort
+  # commands; tree-shaken from prod; inject NO fake annotation into the committed fixture). REACHABILITY
+  # WIN over 3.4: UNLIKE summon (omitted from the committed fixture), the FixtureInterpreter ALREADY tags
+  # dispel@u-0002#1 + shaman@u-0010#0, so BOTH production triggers fire on the committed fixture during
+  # normal playback — the boot test drives REAL playback to the shaman/dispel transition and asserts the
+  # cinematic arms END-TO-END (not just a hand-built intent). Triggers ride the EXISTING renderBeatBehaviors
+  # seam (NO new Layer-0 path, NO new beat tag, NO new PRODUCTION RenderPort method). CLEAN RETURN (R1:
+  # restore, don't recompute) + the suspend-advance guard REUSED from 3.4 unchanged; the 3.4 F1/F2/F3/F4
+  # lessons inherited (poll-the-scene resume; set-flag on the production path — now actually exercised by
+  # shaman/dispel; the done clean return restores faded alpha via resetCinematicAlpha; the 'advance resumes
+  # after done' test required). RECORD-SCRATCH is VISUAL in v0.1 (a freeze/screen-shake/overlay jolt; the
+  # audible scratch SOUND is a deferred asset — Epic 5/5.3 manifest swap; no ad-hoc audio loader, no runtime
+  # network). Gate-PROVABLE: each machine's sequence + clamp + determinism + R1 data shape; the triggers
+  # fire on the right intent (real-fixture end-to-end + hand-built unit + negative branch); the dispel
+  # shatter COINCIDES with the scribe-correction signal (boot onSignal sink); CLEAN RETURN (post-cinematic
+  # snapshot == foldBattleState(timeline,cursor) + reducer state unchanged + alpha restored + advance
+  # resumes); the dev hooks play without mutating the prod overlay (still dispel+shaman); a headless boot
+  # smoke (each runs to done + cast survives, no throw). OPERATOR-verified (NOT a gate — watch pnpm dev
+  # ?cinematic=shaman / ?cinematic=dispel): the simultaneous imp WAVE; the glass-shatter/record-scratch;
+  # first-time legibility; ~60fps (NFR-1). Gates: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts
+  # UNCHANGED — DCE drops the dev flags in prod), full suite green (baseline 59 files/583 tests at the
+  # post-3.4 HEAD), BOTH golden snapshots (pace/+ingest/) byte-stable (no Layer-0 code), build OK + grep
+  # -ril anthropic dist/ = NOTHING (cinematics + dev hooks SDK-free). NOTE: 3-5 is the Epic-3 CAPSTONE —
+  # per the explicit instruction, after 3-5 reaches done (dev-story -> review -> done) epic-3 ALSO flips
+  # in-progress -> done. create-story leaves 3-5 ready-for-dev + epic-3 in-progress. epic-3 stays
+  # in-progress.
+  # 3-5 ready-for-dev -> in-progress -> done (dev-story). The FINAL Epic-3 story (FR-8): the two signature
+  # cinematics — Fallen-Shaman swarm-clear (AC1) + Dispel shatter (AC2) — built EXACTLY on the Story-3.4
+  # pattern. Added the PURE Phaser-free node-testable state machines src/render/shaman-cinematic.ts
+  # (idle->fall->wave->settle->done) + dispel-cinematic.ts (idle->shatter->scratch->reveal->done), each
+  # carrying ONLY {phase,elapsedMs} (R1; the shaman machine models NO per-imp HP — AC1 imps-are-
+  # presentation-only). Generalized arena-scene.ts to a tagged active-cinematic union (3 machines, one
+  # consumer slot, one-at-a-time, first-armed-wins) with the two triggers off the EXISTING Story-3.3
+  # renderBeatBehaviors intents ({shaman,defeat} / {mirage,shatter}) — NO new Layer-0 path, NO new beat
+  # tag, NO new PRODUCTION RenderPort method. The shaman `wave` is a transient 6-imp swarm faded on ONE
+  # simultaneous tween (one readable wave, not a stagger; placeholder rects, destroyed on clean return);
+  # the dispel `scratch` is the VISUAL record-scratch (a freeze-flash overlay — the audible scratch is a
+  # DEFERRED Epic-5/5.3 asset; no ad-hoc audio loader). CLEAN RETURN (R1: restore via the captured
+  # snapshot + foldBattleState truth, never recompute; alpha restored — the F3 lesson) + the suspend-
+  # advance guard (option A) REUSED from 3.4 UNCHANGED (the boot polls the single "any of three"
+  # isCinematicActive query). DEV-only replay hooks ?cinematic=shaman/?cinematic=dispel (DEV-gated in
+  # main.ts, tree-shaken from prod; ArenaHandle + optional one-way RenderPort commands + adapter impls)
+  # play the cinematic DIRECTLY over the current snapshot and inject NO fake annotation — the production
+  # overlay stays dispel+shaman; fixture-interpreter.ts UNTOUCHED. REACHABILITY WIN over 3.4 honored: the
+  # dispel/shaman triggers fire on the committed fixture; the boot test pins the scribe-correction SIGNAL
+  # half of AC2's coincidence on the real fixture, and the real-scene cinematic ARMING is proven end-to-
+  # end under Phaser.HEADLESS (arena-shaman-dispel-cinematic.test.ts). Two JUSTIFIED test fixes (documented
+  # inline, not silent gutting): (1) an ATDD boot assertion that was structurally unsatisfiable with its
+  # own no-arm fake adapter was narrowed to the signal half (arming delegated to the headless smoke); (2) a
+  # PRE-EXISTING 3.4 fixture (a Dispel sequence the new dispel cinematic now correctly arms) swapped for a
+  # non-arming list. Gate-PROVEN: each machine's sequence/clamp/determinism/R1-data; the triggers
+  # (real-fixture signal e2e + hand-built unit + negative branch); the dispel-shatter/scribe-correction
+  # coincidence; CLEAN RETURN (snapshot == foldBattleState(timeline,cursor) + reducer state unchanged +
+  # alpha restored + advance resumes after done — F1/F4); dev hooks play without mutating the prod overlay;
+  # a headless boot smoke (each runs to done + cast survives, no throw). OPERATOR-verified (NOT a gate —
+  # jsdom advances no tweens; watch pnpm dev ?cinematic=shaman / ?cinematic=dispel): the simultaneous imp
+  # WAVE; the glass-shatter/record-scratch jolt; first-time legibility; ~60fps (NFR-1). The Scribe
+  # correction CAPTION cross-out/rewrite is FR-9/Story 4.1, NOT built here. Gates: typecheck/lint clean
+  # (R1/R4/R5 hold, eslint.config.ts UNCHANGED — DCE drops the dev URL branch in prod: no URLSearchParams/
+  # cinematic=== in the bundle), full suite GREEN 65 files / 665 tests (baseline 59/583 at the post-3.4
+  # HEAD; ATDD added 6 files), BOTH golden snapshots (pace/+ingest/) byte-UNCHANGED (no Layer-0 code),
+  # build OK + grep -ril anthropic dist/ = NOTHING (cinematics + dev hooks SDK-free). NO git commit (the
+  # operator commits between stories). NOTE: 3-5 is the Epic-3 CAPSTONE — per the explicit instruction,
+  # epic-3 ALSO flips in-progress -> done below.
+  # 3-5 senior-dev review (2026-06-15): Changes-requested (1 high). H1 (high — production clean return
+  # restored the stale t=0 snapshot, AC1 "returns cleanly" defect the gate missed: the forward tick arms
+  # cinematics via renderTransition/renderBeatBehaviors, NEITHER calls applySnapshot, so cinematicSnapshot
+  # stayed pinned at t=0 and the shaman cinematic — armed at the FINAL cursor — snapped the arena back to
+  # full health); M1 (med — first-armed-wins not enforced, a re-delivered trigger could orphan impSwarm);
+  # L1 (low — dispel reveal flashed an already-faded minion); L2/L3/L4 refuted; P1 process.
+  # 3-5 review fix round 1 (2026-06-15): H1 FIXED (thread the transition's `next` as an arm-snapshot through
+  # renderBeatBehaviors -> playBeatBehaviors(intents, armSnapshot) -> startXCinematic, pinning
+  # cinematicSnapshot at ARM time; dev hooks pass none — the boot re-applies the current snapshot first);
+  # M1 FIXED (guard the arm with if(!isCinematicActive())); L1 FIXED (resetCinematicAlpha('minion') before
+  # the reveal flash). L2/L3/L4 confirmed refuted (no code change; L2 inverted — isSubsumed subsumes
+  # resolve-stagger under hasDispel so prod skips the recoil too; L4 — eslint re-allows phaser in src/game).
+  # Added 5 regression tests (2 H1 + 2 M1 + 1 L1) to arena-shaman-dispel-cinematic.test.ts, each verified
+  # RED-without-fix then GREEN — the H1 pair drives the REAL PhaserRenderAdapter end-to-end under HEADLESS
+  # (a fake cannot fake it). Gates re-GREEN: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts
+  # UNCHANGED), 65 files / 670 tests, build OK, no anthropic in dist, golden snapshots byte-unchanged. 3-5
+  # stays done; epic-3 reverted to in-progress (capstone flip deferred to the operator's epic-3 review,
+  # matching the Epic-1/Epic-2 flip-post-senior-review precedent now that the H1 blocker is fixed).
+  3-5: done

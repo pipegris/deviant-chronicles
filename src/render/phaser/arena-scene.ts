@@ -10,7 +10,6 @@ import { toRenderModel } from '../render-model';
 import { initialBattleState } from '../../model/battle-model';
 import {
   advanceSummon,
-  initialSummonState,
   startSummon,
   CUTAWAY_MS,
   BLOW_MS,
@@ -18,6 +17,24 @@ import {
   SUMMON_CINEMATIC_TOTAL_MS,
 } from '../summon-cinematic';
 import type { SummonCinematicPhase, SummonCinematicState } from '../summon-cinematic';
+import {
+  advanceShaman,
+  startShaman,
+  FALL_MS,
+  WAVE_MS,
+  SETTLE_MS,
+  SHAMAN_CINEMATIC_TOTAL_MS,
+} from '../shaman-cinematic';
+import type { ShamanCinematicPhase, ShamanCinematicState } from '../shaman-cinematic';
+import {
+  advanceDispel,
+  startDispel,
+  SHATTER_MS,
+  SCRATCH_MS,
+  REVEAL_MS,
+  DISPEL_CINEMATIC_TOTAL_MS,
+} from '../dispel-cinematic';
+import type { DispelCinematicPhase, DispelCinematicState } from '../dispel-cinematic';
 import {
   DEFAULT_ASSET_MANIFEST,
   generatePlaceholderTextures,
@@ -72,16 +89,28 @@ export class ArenaScene extends Phaser.Scene {
   // silently skipped. No pixels are inspected; HEADLESS draws nothing.
   private lastPlayed: AnimationIntent[] = [];
 
-  // ---- the THUNDORR-summon cinematic (Story 3.4) ----
-  // The pure cinematic STATE (idle at rest). The scene DRIVES its Phaser set-piece FROM this phase;
-  // the sequence + the terminal `done` (where the clean return fires) are gate-provable off the pure
-  // summon-cinematic machine. Render-side transient state — never serialized, never pushed upstream
-  // (R5/AC1). [story Task 3]
-  private cinematic: SummonCinematicState = initialSummonState();
+  // ---- the signature cinematics (Story 3.4 summon + Story 3.5 shaman/dispel) ----
+  // The ACTIVE cinematic, tagged by kind (null = at rest). The scene multiplexes the THREE independent
+  // pure machines (summon-cinematic / shaman-cinematic / dispel-cinematic) through this ONE consumer
+  // slot: only ONE plays at a time (on the committed fixture the shaman defeat and the dispel shatter
+  // fall on DIFFERENT transitions, so they never co-arm; if a future bundle put two on one transition
+  // the first-armed wins — a documented, acceptable v0.1 simplification, NOT a cinematic queue). The
+  // scene DRIVES each Phaser set-piece FROM its machine's phase; the sequence + the terminal `done`
+  // (where the clean return fires) are gate-provable off the pure machines. Render-side transient state
+  // — never serialized, never pushed upstream (R5/AC1). [story Task 4 §"Scene cinematic state"]
+  private activeCinematic:
+    | { kind: 'summon'; state: SummonCinematicState }
+    | { kind: 'shaman'; state: ShamanCinematicState }
+    | { kind: 'dispel'; state: DispelCinematicState }
+    | null = null;
   // The snapshot the clean return re-applies on `done`. The cinematic CAPTURES the last BattleState
   // the scene was given (already foldBattleState(timeline, cursor) truth) and RESTORES it via the SNAP
   // path (applySnapshot) — it NEVER recomputes mechanics (R1: restore, don't recompute). [story Task 2]
   private cinematicSnapshot: BattleState | null = null;
+  // The transient imp swarm (Story 3.5 AC1): the Rectangles spawned at the shaman `wave` entry and faded
+  // on ONE simultaneous tween, destroyed on the tween complete / the clean return. Render-side transient
+  // state — not modeled mechanics (NO per-imp HP; AC1 imps-are-presentation-only). [story Task 4]
+  private impSwarm: Phaser.GameObjects.Rectangle[] = [];
 
   constructor() {
     super('Arena');
@@ -163,77 +192,195 @@ export class ArenaScene extends Phaser.Scene {
   // simultaneous-imp-death wave) are Stories 3.4/3.5, NOT built here. Never throws on a well-formed
   // intent list; an unknown behavior/target is a safe no-op (fail-closed, exactly runIntent's posture).
   // [story Task 3 "PLACEHOLDER on the existing cast"]
-  playBeatBehaviors(intents: BeatBehaviorIntent[]): void {
-    // The THUNDORR cinematic ELEVATION (Story 3.4): a `summon` behavior intent STARTS the full-scene
-    // cinematic instead of the placeholder flash. The trigger is summon-SPECIFIC — a behavior list
-    // without a summon intent (a Dispel/Shaman sequence) leaves the cinematic at rest. The cinematic
-    // rides the EXISTING renderBeatBehaviors seam (NO new RenderPort method). [story Task 3]
+  playBeatBehaviors(intents: BeatBehaviorIntent[], armSnapshot?: BattleState): void {
+    // The cinematic ELEVATION (Story 3.4 summon + Story 3.5 shaman/dispel): a signature-beat intent
+    // STARTS its full-scene cinematic instead of running the placeholder cues. The triggers ride the
+    // EXISTING renderBeatBehaviors seam (NO new production RenderPort method) — they key on the Story-3.3
+    // behavior intents planBeatBehaviors ALREADY emits:
+    //   - summon: { target:'eidolon', behavior:'summon' } (Story 3.4) — omitted from the committed fixture.
+    //   - shaman: { target:'shaman', behavior:'defeat' } (+ { target:'imp', behavior:'swarm-clear' }) on
+    //     the breakthrough discharge (beat-behavior.ts L166-167) — DOES fire on the committed fixture.
+    //   - dispel: { target:'mirage', behavior:'shatter' } (+ resolve-stagger + reveal) on a dispel-tagged
+    //     beat (beat-behavior.ts L187-189) — DOES fire on the committed fixture.
+    // An intent list with NONE of these leaves the cinematic at rest (the trigger is intent-specific).
+    // Only one cinematic arms per call; the shaman defeat and the dispel shatter never co-occur in one
+    // committed-fixture transition (Dev Notes §"Scene cinematic state"). [story Task 4 §"Triggers"]
+    //
+    // FIRST-ARMED-WINS (review M1): the arm is GUARDED by !isCinematicActive() so a re-delivered trigger
+    // while a cinematic is mid-play is a NO-OP — it does NOT overwrite the active machine (which would
+    // reset it to its first phase + orphan the impSwarm). This enforces the documented contract (Dev
+    // Notes §"Scene cinematic state": "the first-armed wins, the second is a no-op while active").
+    //
+    // CLEAN-RETURN SNAPSHOT CAPTURE (review H1): the production forward tick arms a cinematic via
+    // renderTransition→playAnimations + renderBeatBehaviors→playBeatBehaviors — NEITHER calls
+    // applySnapshot, so cinematicSnapshot would stay pinned at the boot's t=0 frame. Since the shaman
+    // cinematic arms at the FINAL cursor, the clean return would then snap the arena back to the
+    // full-health t=0 state right after the swarm-clear (AC1 "returns cleanly" violated). So the adapter
+    // threads `armSnapshot` = the transition's `next` (foldBattleState truth for the armed cursor) and we
+    // pin it at ARM time. The dev hooks pass NO armSnapshot — the boot re-applies the CURRENT snapshot
+    // via adapter.render() right before, so the already-captured snapshot is the correct frame. [review H1]
     const hasSummon = intents.some((i) => i.target === 'eidolon' && i.behavior === 'summon');
-    if (hasSummon) {
-      this.startCinematic();
+    const hasShaman = intents.some((i) => i.target === 'shaman' && i.behavior === 'defeat');
+    const hasDispel = intents.some((i) => i.target === 'mirage' && i.behavior === 'shatter');
+    if (!this.isCinematicActive()) {
+      if (hasSummon) {
+        this.startSummonCinematic(armSnapshot);
+      } else if (hasShaman) {
+        this.startShamanCinematic(armSnapshot);
+      } else if (hasDispel) {
+        this.startDispelCinematic(armSnapshot);
+      }
     }
     for (const intent of intents) {
-      // When the cinematic is armed, its summon/decisive-blow intents are SUBSUMED by the set-piece
-      // (the cutaway overlay + the boss-stand-in blow own those visuals — decisive-blow maps to the
-      // `blow` phase), so skip them; any other intents in the list still run their placeholder cues.
-      const subsumed = hasSummon && intent.target === 'eidolon' && (intent.behavior === 'summon' || intent.behavior === 'decisive-blow');
-      if (subsumed) continue;
+      // When a cinematic is armed, the intents its set-piece SUBSUMES are skipped (the cinematic phases
+      // own those visuals); any other intents in the list still run their placeholder cues.
+      if (this.isSubsumed(intent, { hasSummon, hasShaman, hasDispel })) continue;
       this.runBehavior(intent);
     }
   }
 
-  // ---- the THUNDORR-summon cinematic runner (Story 3.4): a DRIVEN set-piece, not a Phaser Timeline ----
-
-  // Arm + enter the cinematic (the first active phase, cutaway) and play the cutaway set-piece. The
-  // phase ADVANCES off the render-side cadence (the scene's update() ticks advanceSummon each frame)
-  // OR a synchronous advanceCinematicToDone() — NOT a tween onComplete (jsdom never fires it, so the
-  // smoke could not reach `done`). FAIL-CLOSED: the overlay/flash helpers no-op on a missing display.
-  private startCinematic(): void {
-    this.cinematic = startSummon();
-    this.playPhaseVisual(this.cinematic.phase);
+  // Decide whether a behavior intent is SUBSUMED by an armed cinematic (the set-piece owns its visuals,
+  // mirroring the Story-3.4 summon subsumed-skip). Summon subsumes summon/decisive-blow (the cutaway +
+  // blow); shaman subsumes the swarm-clear + defeat (the fall + wave own the imp wave); dispel subsumes
+  // the shatter + resolve-stagger + reveal (the shatter/scratch/reveal phases). [story Task 4]
+  private isSubsumed(
+    intent: BeatBehaviorIntent,
+    armed: { hasSummon: boolean; hasShaman: boolean; hasDispel: boolean },
+  ): boolean {
+    if (armed.hasSummon && intent.target === 'eidolon' && (intent.behavior === 'summon' || intent.behavior === 'decisive-blow')) {
+      return true;
+    }
+    if (armed.hasShaman && ((intent.target === 'shaman' && intent.behavior === 'defeat') || (intent.target === 'imp' && intent.behavior === 'swarm-clear'))) {
+      return true;
+    }
+    if (
+      armed.hasDispel &&
+      ((intent.target === 'mirage' && (intent.behavior === 'shatter' || intent.behavior === 'reveal')) ||
+        (intent.target === 'forgemaiden' && intent.behavior === 'resolve-stagger'))
+    ) {
+      return true;
+    }
+    return false;
   }
 
-  // Phaser's per-frame hook (render-side wall-clock — the same cadence the rAF boot loop owns). While
-  // the cinematic is active, advance the pure machine by the frame delta and, on a phase CHANGE, play
-  // that phase's visual; on reaching `done`, fire the clean return. jsdom does not call update()
+  // ---- the cinematic runners (Story 3.4 summon + Story 3.5 shaman/dispel): DRIVEN set-pieces ----
+
+  // Arm + enter a cinematic at its first active phase and play that phase's set-piece. Each phase
+  // ADVANCES off the render-side cadence (the scene's update() ticks the active machine each frame) OR
+  // a synchronous advanceCinematicToDone() — NOT a tween onComplete (jsdom never fires it, so the smoke
+  // could not reach `done`). FAIL-CLOSED: the overlay/flash helpers no-op on a missing display.
+  // Each start ARMS the cinematic and, when given an arm-snapshot (the production forward-tick path),
+  // pins it as the snapshot the `done` clean return restores (review H1; see playBeatBehaviors). A
+  // missing arm-snapshot (the dev hooks) leaves the previously-captured snapshot in place.
+  private startSummonCinematic(armSnapshot?: BattleState): void {
+    if (armSnapshot) this.cinematicSnapshot = armSnapshot;
+    this.activeCinematic = { kind: 'summon', state: startSummon() };
+    this.playSummonPhaseVisual(this.activeCinematic.state.phase);
+  }
+
+  private startShamanCinematic(armSnapshot?: BattleState): void {
+    if (armSnapshot) this.cinematicSnapshot = armSnapshot;
+    this.activeCinematic = { kind: 'shaman', state: startShaman() };
+    this.playShamanPhaseVisual(this.activeCinematic.state.phase);
+  }
+
+  private startDispelCinematic(armSnapshot?: BattleState): void {
+    if (armSnapshot) this.cinematicSnapshot = armSnapshot;
+    this.activeCinematic = { kind: 'dispel', state: startDispel() };
+    this.playDispelPhaseVisual(this.activeCinematic.state.phase);
+  }
+
+  // Phaser's per-frame hook (render-side wall-clock — the same cadence the rAF boot loop owns). While a
+  // cinematic is active, advance WHICHEVER machine is active by the frame delta and, on a phase CHANGE,
+  // play that phase's visual; on reaching `done`, fire the clean return. jsdom does not call update()
   // (no real game loop), so the smoke drives the sequence via advanceCinematicToDone() instead — both
-  // paths reach the SAME terminal + clean-return snap. [story Task 3 "drive the phase from the cadence"]
+  // paths reach the SAME terminal + clean-return snap. [story Task 4 "drive the phase from the cadence"]
   override update(_time: number, deltaMs: number): void {
     void _time; // Phaser's update(time, delta) hook; we advance off `delta` only (codebase convention)
-    if (!this.isCinematicActive()) return;
-    const before = this.cinematic.phase;
-    this.cinematic = advanceSummon(this.cinematic, deltaMs);
-    if (this.cinematic.phase !== before) this.playPhaseVisual(this.cinematic.phase);
+    this.advanceActiveCinematic(deltaMs);
   }
 
-  // Drive the cinematic straight to `done` synchronously (the headless smoke's hook — jsdom advances
-  // no tweens/timers, so the gate reaches the terminal + the clean-return snap this way). A single
-  // total-span delta clamps the pure machine to `done`; playPhaseVisual fires the clean return.
-  // A no-op if the cinematic is not active. Never throws (fail-closed).
+  // Drive the active cinematic straight to `done` synchronously (the headless smoke's hook — jsdom
+  // advances no tweens/timers, so the gate reaches the terminal + the clean-return snap this way). A
+  // single total-span delta clamps the active machine to `done`; the phase visual fires the clean
+  // return. A no-op if no cinematic is active. Never throws (fail-closed). [story Task 4]
   advanceCinematicToDone(): void {
-    if (!this.isCinematicActive()) return;
-    this.cinematic = advanceSummon(this.cinematic, SUMMON_CINEMATIC_TOTAL_MS);
-    this.playPhaseVisual(this.cinematic.phase);
+    const active = this.activeCinematic;
+    if (!active || !this.isCinematicActive()) return;
+    switch (active.kind) {
+      case 'summon':
+        this.advanceActiveCinematic(SUMMON_CINEMATIC_TOTAL_MS);
+        return;
+      case 'shaman':
+        this.advanceActiveCinematic(SHAMAN_CINEMATIC_TOTAL_MS);
+        return;
+      case 'dispel':
+        this.advanceActiveCinematic(DISPEL_CINEMATIC_TOTAL_MS);
+        return;
+      default:
+        return;
+    }
   }
 
-  // The current cinematic phase — the smoke reads this (mirroring lastPlayedIntents()) to assert the
-  // cinematic armed + reached `done` without inspecting pixels.
-  cinematicPhase(): SummonCinematicPhase {
-    return this.cinematic.phase;
+  // Advance whichever machine is active by `deltaMs`, playing the new phase's visual on a phase change.
+  // The shared transition step both update() (per-frame) and advanceCinematicToDone() (clamp) call, so
+  // the per-machine advanceX + the matching phase visual stay in lock-step. A no-op when at rest.
+  private advanceActiveCinematic(deltaMs: number): void {
+    const active = this.activeCinematic;
+    if (!active || !this.isCinematicActive()) return;
+    switch (active.kind) {
+      case 'summon': {
+        const before = active.state.phase;
+        active.state = advanceSummon(active.state, deltaMs);
+        if (active.state.phase !== before) this.playSummonPhaseVisual(active.state.phase);
+        return;
+      }
+      case 'shaman': {
+        const before = active.state.phase;
+        active.state = advanceShaman(active.state, deltaMs);
+        if (active.state.phase !== before) this.playShamanPhaseVisual(active.state.phase);
+        return;
+      }
+      case 'dispel': {
+        const before = active.state.phase;
+        active.state = advanceDispel(active.state, deltaMs);
+        if (active.state.phase !== before) this.playDispelPhaseVisual(active.state.phase);
+        return;
+      }
+      default:
+        return;
+    }
   }
 
-  // True while the cinematic is mid-play (a non-resting, non-terminal phase). The boot's
-  // advanceIfPlaying reads the analogous flag to SUSPEND the forward tick during the cutaway.
+  // The current cinematic phase — the smoke reads this to assert the cinematic armed + reached `done`
+  // without inspecting pixels. Returns the active machine's phase, or 'idle' at rest. The union of the
+  // three phase types reduces to the shared literals the smoke checks ('idle' / not-'idle' / 'done').
+  cinematicPhase(): SummonCinematicPhase | ShamanCinematicPhase | DispelCinematicPhase {
+    return this.activeCinematic?.state.phase ?? 'idle';
+  }
+
+  // True while ANY of the three cinematics is mid-play (a non-resting, non-terminal phase). The boot's
+  // advanceIfPlaying reads the analogous flag to SUSPEND the forward tick — extending this to "any of
+  // the three" keeps the boot guard UNCHANGED in shape (it polls this single query). [story Task 4]
   isCinematicActive(): boolean {
-    return this.cinematic.phase !== 'idle' && this.cinematic.phase !== 'done';
+    const phase = this.activeCinematic?.state.phase;
+    return phase != null && phase !== 'idle' && phase !== 'done';
   }
 
-  // Play the placeholder set-piece for a phase. PLACEHOLDER art (real THUNDORR art is Story 5.3's
-  // manifest swap): cutaway = a full-screen freeze overlay (the environmentOverlay precedent); blow =
-  // a large flash + lunge on the boss stand-in (the decisive blow); depart = a fade-out (the colossus
-  // leaves); done = the CLEAN RETURN — re-apply the captured snapshot via the SNAP path (restore, not
-  // recompute, R1) so the arena shows the correct BattleState for the cursor. FAIL-CLOSED throughout.
-  private playPhaseVisual(phase: SummonCinematicPhase): void {
+  // The clean return shared by all three cinematics: KILL any lingering fade on the faded stand-ins and
+  // reset their alpha to the resting 1, THEN re-apply the captured reducer snapshot via the SNAP path
+  // (restore the foldBattleState truth — never recompute, R1) so the arena shows the correct BattleState
+  // for the cursor. applySnapshot restores position/bars but NOT alpha (review F3), so the alpha reset
+  // must precede it. Fail-closed: a no-op on a missing display / snapshot. [story Task 3 §"Clean return"]
+  private cleanReturn(...fadedTargets: AnimationIntent['target'][]): void {
+    for (const target of fadedTargets) this.resetCinematicAlpha(target);
+    if (this.cinematicSnapshot) this.applySnapshot(this.cinematicSnapshot);
+  }
+
+  // ---- the THUNDORR-summon set-piece (Story 3.4): PLACEHOLDER art (real art is Story 5.3) ----
+  // cutaway = a full-screen freeze overlay; blow = a flash + lunge on the boss stand-in; depart = a
+  // fade-out (the colossus leaves); done = the CLEAN RETURN. FAIL-CLOSED throughout.
+  private playSummonPhaseVisual(phase: SummonCinematicPhase): void {
     switch (phase) {
       case 'cutaway':
         this.environmentOverlay(CUTAWAY_MS);
@@ -246,30 +393,130 @@ export class ArenaScene extends Phaser.Scene {
         this.fadeOut('boss', DEPART_MS);
         return;
       case 'done':
-        // CLEAN RETURN: the `depart` phase faded the boss stand-in to alpha 0 (a no-yoyo fade — "it
-        // leaves"), and applySnapshot only restores position/bars, never alpha — so without this the
-        // stand-in would be left INVISIBLE after the cinematic (review F3). Kill the lingering fade and
-        // reset alpha to the resting 1 BEFORE re-applying the snapshot, so the arena returns cleanly to
-        // the visible arena state. Fail-closed: a no-op on a missing display. [review F3]
-        this.resetCinematicAlpha('boss');
-        // restore the captured reducer snapshot (foldBattleState truth) — never recompute (R1).
-        if (this.cinematicSnapshot) this.applySnapshot(this.cinematicSnapshot);
+        // CLEAN RETURN: `depart` faded the boss stand-in to alpha 0; restore it before re-snapping (F3).
+        this.cleanReturn('boss');
         return;
       default:
         return;
     }
   }
 
-  // Reset the cinematic's faded stand-in to the resting alpha on the clean return (review F3). The
-  // `depart` fadeOut tweens alpha->0 with no yoyo, so on `done` we must KILL that still-running tween
-  // (else it keeps driving alpha back to 0 after we restore) and set alpha to 1. Guarded for the
-  // headless env (tweens?.killTweensOf is absent in some jsdom shapes) and a missing display — a safe
-  // no-op, never throws (the fail-closed runner posture). [review F3]
+  // ---- the Fallen-Shaman swarm-clear set-piece (Story 3.5, AC1): PLACEHOLDER art ----
+  // fall = the Shaman (ROOT CAUSE, on the boss stand-in) topples (fadeOut down); wave = ALL symptom-imps
+  // die SIMULTANEOUSLY in ONE readable wave (the headline AC1 moment); settle = the dust clears (a brief
+  // overlay breath so the wave reads); done = the CLEAN RETURN (restore the boss + imp-zone alpha, then
+  // re-snap). The wave's SIMULTANEITY is load-bearing — it is ONE beat, NOT a stagger. FAIL-CLOSED.
+  private playShamanPhaseVisual(phase: ShamanCinematicPhase): void {
+    switch (phase) {
+      case 'fall':
+        // The root cause falls: the boss stand-in topples (a down-lunge + a fade).
+        this.lunge('boss', FALL_MS, 1, -1);
+        this.fadeOut('boss', FALL_MS);
+        return;
+      case 'wave':
+        // The headline AC1 visual: spawn the transient imp swarm around the minion zone and fade ALL of
+        // them on ONE simultaneous tween so they vanish together — the operator sees the whole symptom
+        // class clear in one beat (NOT a stagger). The minion stand-in fades in the same beat.
+        this.playImpWave(WAVE_MS);
+        this.fadeOut('minion', WAVE_MS);
+        return;
+      case 'settle':
+        // The dust settles: a brief environmental breath so the wave reads before playback resumes.
+        this.environmentOverlay(SETTLE_MS);
+        return;
+      case 'done':
+        // CLEAN RETURN: `fall`/`wave` faded the boss + minion stand-ins; restore both alphas, destroy any
+        // surviving transient imps, then re-snap (F3 lesson, extended to the shaman/imp stand-ins).
+        this.destroyImpSwarm();
+        this.cleanReturn('boss', 'minion');
+        return;
+      default:
+        return;
+    }
+  }
+
+  // ---- the Dispel shatter set-piece (Story 3.5, AC2): PLACEHOLDER art ----
+  // shatter = the glass-SHATTER (a sharp tint + a burst lunge on the mirage/minion stand-in); scratch =
+  // the record-SCRATCH jolt (a hard full-screen overlay flash — the VISUAL scratch per Task 2; the
+  // audible scratch is a deferred Epic-5 asset; coincides with the Story-3.3 scribe-correction signal);
+  // reveal = the real situation revealed (a flash on the stand-in); done = the CLEAN RETURN. FAIL-CLOSED.
+  private playDispelPhaseVisual(phase: DispelCinematicPhase): void {
+    switch (phase) {
+      case 'shatter':
+        // The Mirage (false assumption made real) breaks: an elevated tint + burst on the minion stand-in.
+        this.lunge('minion', SHATTER_MS, 1);
+        this.tint('minion', 0x88ccff, SHATTER_MS);
+        this.fadeOut('minion', SHATTER_MS);
+        return;
+      case 'scratch':
+        // The record-SCRATCH jolt — the visual "stop the music, that's wrong" beat (a hard freeze-flash).
+        this.environmentOverlay(SCRATCH_MS);
+        return;
+      case 'reveal':
+        // The truth behind the dispelled illusion is revealed. The `shatter` fadeOut drove the minion
+        // stand-in toward alpha 0 (no yoyo), so a flash here would yoyo 0->0.4->0 and the reveal beat
+        // would not read. RESTORE the stand-in to a visible alpha 1 FIRST (kill the lingering fadeOut),
+        // then flash — so the revealed stand-in is actually visible. [review L1]
+        this.resetCinematicAlpha('minion');
+        this.flash('minion', REVEAL_MS);
+        return;
+      case 'done':
+        // CLEAN RETURN: `shatter` faded the minion stand-in; restore its alpha before re-snapping (F3).
+        this.cleanReturn('minion');
+        return;
+      default:
+        return;
+    }
+  }
+
+  // Reset a cinematic's faded stand-in to the resting alpha on the clean return (review F3). A no-yoyo
+  // fadeOut tweens alpha->0, so on `done` we must KILL that still-running tween (else it keeps driving
+  // alpha back to 0 after we restore) and set alpha to 1. Guarded for the headless env
+  // (tweens?.killTweensOf is absent in some jsdom shapes) and a missing display — a safe no-op, never
+  // throws (the fail-closed runner posture). [review F3]
   private resetCinematicAlpha(target: AnimationIntent['target']): void {
     const display = this.displayOf(target);
     if (!display) return;
     this.tweens?.killTweensOf?.(display);
     display.alpha = 1;
+  }
+
+  // The simultaneous imp-swarm wave (AC1): spawn N small transient imp Rectangles around the minion zone
+  // and fade them ALL on ONE tween (identical duration, started together) so they vanish SIMULTANEOUSLY
+  // — the operator literally sees the swarm clear in ONE readable wave (NOT a stagger). PLACEHOLDER art
+  // (transient rects, swappable for real imp sprites in Story 5.3); NO per-imp HP, NO modeled imp count
+  // in the pure machine (the count is purely a render concern here). Fail-closed: a no-op if the minion
+  // stand-in or add/tween manager is unavailable (HEADLESS shapes). [story Dev Notes §"Shaman `wave`"]
+  private playImpWave(durationMs: number): void {
+    const anchor = this.displayOf('minion');
+    if (!anchor) return;
+    const count = 6;
+    const spread = 120;
+    for (let i = 0; i < count; i++) {
+      const offsetX = (i - (count - 1) / 2) * (spread / count);
+      const offsetY = ((i % 2) - 0.5) * 30;
+      const imp = this.add?.rectangle(anchor.x + offsetX, anchor.y + offsetY, 14, 14, 0xcc4444);
+      if (!imp) continue;
+      this.impSwarm.push(imp);
+    }
+    // ALL imps fade on ONE tween (a single targets array, one duration) so they clear together.
+    if (this.impSwarm.length > 0) {
+      this.tweens?.add({
+        targets: this.impSwarm,
+        alpha: 0,
+        duration: Math.max(1, durationMs),
+        onComplete: () => this.destroyImpSwarm(),
+      });
+    }
+  }
+
+  // Destroy any surviving transient imp rects (the clean return + the wave tween's onComplete both call
+  // this; idempotent — the array is cleared after). Fail-closed on a missing destroy(). [story Task 4]
+  private destroyImpSwarm(): void {
+    for (const imp of this.impSwarm) {
+      (imp as unknown as { destroy?: () => void }).destroy?.();
+    }
+    this.impSwarm = [];
   }
 
   // ---- smoke-test introspection (no pixels) — let the headless boot assert the cast/bars/gauge ----

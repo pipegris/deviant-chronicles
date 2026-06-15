@@ -7,15 +7,20 @@ import { startArena } from './render/arena-boot';
 document.addEventListener('DOMContentLoaded', () => {
   const handle = startArena('game-container');
 
-  // Story 3.4: the DEV-ONLY preview trigger. `?cinematic=summon` plays the THUNDORR cinematic on
-  // demand so the operator can WATCH it now — the committed FixtureInterpreter omits `summon` by
-  // design (the thin redacted slice has no groundable sub-agent-spawn event), so the PRODUCTION summon
-  // trigger never fires in the dev fixture. GUARDED by import.meta.env.DEV: Vite statically replaces
-  // it with `false` in `build`, so the entire branch (and the previewSummonCinematic call tree)
-  // dead-code-eliminates from the production bundle — the dev-only ergonomics never ship. It plays the
-  // cinematic DIRECTLY over the current snapshot; it injects NO fake summon into the production overlay.
+  // The DEV-ONLY preview triggers (Story 3.4 summon + Story 3.5 shaman/dispel). The `?cinematic=` URL
+  // flag plays a signature cinematic on demand so the operator can WATCH it. `summon` is omitted from
+  // the committed FixtureInterpreter by design (no groundable sub-agent-spawn event), so its dev preview
+  // is the ONLY way to see it; `shaman` + `dispel` DO fire on the committed fixture during normal
+  // playback (the FixtureInterpreter tags shaman@u-0010#0 + dispel@u-0002#1), so their hooks are a
+  // replay-on-demand convenience (re-watch without scrubbing to the exact beat). GUARDED by
+  // import.meta.env.DEV: Vite statically replaces it with `false` in `build`, so the entire branch (and
+  // the preview*Cinematic call trees) dead-code-eliminates from the production bundle — the dev-only
+  // ergonomics never ship. Each plays the cinematic DIRECTLY over the current snapshot; NONE injects a
+  // fake annotation into the production overlay.
   if (import.meta.env.DEV) {
     const cinematic = new URLSearchParams(window.location.search).get('cinematic');
     if (cinematic === 'summon') handle.previewSummonCinematic();
+    else if (cinematic === 'shaman') handle.previewShamanCinematic();
+    else if (cinematic === 'dispel') handle.previewDispelCinematic();
   }
 });

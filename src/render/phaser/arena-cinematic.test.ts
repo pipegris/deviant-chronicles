@@ -44,11 +44,19 @@ const SUMMON_INTENTS: BeatBehaviorIntent[] = [
   { target: 'eidolon', behavior: 'decisive-blow', durationMs: 600 },
 ];
 
-// A behavior list with NO summon intent (a Dispel sequence) — must NOT arm the cinematic.
+// A behavior list with NO cinematic-arming intent — must NOT arm the summon cinematic (or any other).
+// DEV-STORY JUSTIFIED CHANGE (Story 3.5): this fixture was ORIGINALLY a Dispel sequence
+// ({mirage,shatter}+{forgemaiden,resolve-stagger}+{mirage,reveal}) under the premise "a Dispel sequence
+// does NOT arm the (summon) cinematic" — TRUE in Story 3.4 (no dispel cinematic existed). Story 3.5 adds
+// the Dispel shatter cinematic, which CORRECTLY arms on the {mirage,shatter} intent, so that exact list
+// now (rightly) yields cinematicPhase()==='shatter'. The test's true purpose — the summon trigger is
+// summon-SPECIFIC, an unrelated behavior list leaves the cinematic at rest — is preserved by using a
+// genuinely non-arming list (a lone resurrect loop, the same NEUTRAL list the Story-3.5 smoke uses). The
+// dispel/shaman arming is proven in arena-shaman-dispel-cinematic.test.ts. This does not weaken the 3.4
+// trigger proof; it corrects a fixture made stale by the new (correct) dispel trigger. [story Task 4
+// "isCinematicActive() becomes 'any of three'"; orchestrator "fix the test WITH a documented justification"]
 const NON_SUMMON_INTENTS: BeatBehaviorIntent[] = [
-  { target: 'mirage', behavior: 'shatter', durationMs: 360 },
-  { target: 'forgemaiden', behavior: 'resolve-stagger', durationMs: 320 },
-  { target: 'mirage', behavior: 'reveal', durationMs: 400 },
+  { target: 'imp', behavior: 'resurrect', durationMs: 400 },
 ];
 
 // Boot a HEADLESS game and resolve once the Arena scene's create() has run (copied verbatim from
@@ -179,8 +187,8 @@ describe('Story 3.4 AC1 — headless Phaser smoke: a summon intent ARMS + RUNS t
   });
 });
 
-describe('Story 3.4 AC1 — the TRIGGER is summon-specific (a non-summon behavior list does NOT arm the cinematic)', () => {
-  it('a behavior list WITHOUT a summon intent leaves the cinematic at idle', async () => {
+describe('Story 3.4 AC1 — the TRIGGER is summon-specific (a non-arming behavior list does NOT arm the cinematic)', () => {
+  it('a behavior list with NO cinematic-arming intent leaves the cinematic at idle', async () => {
     const { game, scene } = await bootArena({ manifest: {} });
     activeGame = game;
     scene.playBeatBehaviors(NON_SUMMON_INTENTS);
