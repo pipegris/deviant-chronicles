@@ -401,3 +401,9 @@ development_status:
   # stays done; epic-3 reverted to in-progress (capstone flip deferred to the operator's epic-3 review,
   # matching the Epic-1/Epic-2 flip-post-senior-review precedent now that the H1 blocker is fixed).
   3-5: done
+  # Epic 4 — The Telling & The Teaching (Layer 2 — Told + Portal)
+  epic-4: in-progress
+  4-1: backlog
+  4-2: backlog
+  4-3: backlog
+  4-4: backlog
