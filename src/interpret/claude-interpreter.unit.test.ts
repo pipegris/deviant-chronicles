@@ -50,7 +50,9 @@ describe('Story 3.2 — ClaudeInterpreter exposes config-as-data version knobs',
   it('defaults interpreterVersion + promptVersion to the documented literals', () => {
     const interp = new ClaudeInterpreter({ client: fakeWithTool() });
     expect(interp.interpreterVersion).toBe('claude-sonnet-4-6/v1');
-    expect(interp.promptVersion).toBe('beat-tag-v1');
+    // Story 10.1 bumped the default prompt version to beat-tag-v2 (SYSTEM_PROMPT gained the
+    // verbatim-id / no-invented-id instruction; provenance stamps the version, so it must change).
+    expect(interp.promptVersion).toBe('beat-tag-v2');
   });
 
   it('lets the constructor override both versions (the freeze-CLI stamping seam)', () => {

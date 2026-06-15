@@ -42,7 +42,10 @@ interface ContentBlock {
 // `model` id — see Dev Notes §"Escalation". [CLAUDE.md "no hardcoded tuning constants"]
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_INTERPRETER_VERSION = 'claude-sonnet-4-6/v1';
-const DEFAULT_PROMPT_VERSION = 'beat-tag-v1';
+// beat-tag-v2 (Story 10.1): bumped because the SYSTEM_PROMPT content materially changed (verbatim-id
+// instruction). The interpreter stamps promptVersion into provenance, so a different prompt must be a
+// different addressable run. [Dev Notes §"promptVersion"]
+const DEFAULT_PROMPT_VERSION = 'beat-tag-v2';
 // Generous, fixed ceiling for the (small, non-streaming, offline) annotation array. max_tokens
 // is REQUIRED by the Messages API. Sampling params / budget_tokens are deliberately OMITTED —
 // claude-sonnet-4-6 + claude-opus-4-8 use adaptive thinking and 400 on those. [claude-api skill]
@@ -91,7 +94,10 @@ const SYSTEM_PROMPT =
   'JSON array of normalized session events and tag the signature beats (shaman, dispel, ' +
   'summon). For each beat, set eventRef to the anchor event id, and groundingPointer.eventRefs ' +
   'to the full set of event ids it dramatizes (including the anchor). Emit them via the ' +
-  `${EMIT_TOOL_NAME} tool. Make no claim you cannot ground in the provided events.`;
+  `${EMIT_TOOL_NAME} tool. Make no claim you cannot ground in the provided events. ` +
+  'CRITICAL: every eventRef and every groundingPointer.eventRefs value MUST be copied VERBATIM ' +
+  'from an eventId that is present in the input events. NEVER invent, modify, abbreviate, or ' +
+  'guess an event id; if you cannot find a matching id in the input, do not emit that beat.';
 
 export interface ClaudeInterpreterOptions {
   client?: AnthropicLike;
@@ -159,7 +165,50 @@ export class ClaudeInterpreter implements BeatInterpreter {
     // deterministically over the grounded events) — so the frozen annotation's content address is
     // interpreter-stamped, not LLM-forgeable, and stays consistent with annotationHash. Zod still
     // validates the model's eventRef/beatType/confidence/groundingPointer (fail-loud preserved).
-    return rawAnnotations.map((a) => this.stampProvenance(a, groundingEvents));
+    const annotations = rawAnnotations.map((a) => this.stampProvenance(a, groundingEvents));
+
+    // The model's eventRef/groundingPointer are UNTRUSTED: over a large (600+ event) input it
+    // occasionally invents an eventId that resolves to no real event, which would block the whole
+    // bake at the fail-loud freeze boundary. Sanitize against the authoritative id set first.
+    return this.sanitizeAgainstEvents(annotations, groundingEvents);
+  }
+
+  // Drop hallucinated/dangling refs against the real eventId set so the result is fully resolvable
+  // (freezeAnnotations stays fail-loud and passes). An annotation whose primary `eventRef` isn't a
+  // real id can't be grounded → drop it; otherwise keep it, filtering groundingPointer.eventRefs to
+  // in-set ids and falling back to [eventRef] if that empties (grounding is never empty).
+  //
+  // Sanitizing AFTER stampProvenance is deliberate: sourceHash is derived in stampProvenance from the
+  // model's original refs, so trimming dangling refs here does NOT retroactively change a kept hash —
+  // it only removes ids that would have failed loud at freeze anyway. Warns a count-only (no-PII) summary.
+  private sanitizeAgainstEvents(
+    annotations: BeatAnnotation[],
+    groundingEvents: NormalizedEvent[],
+  ): BeatAnnotation[] {
+    const realIds = new Set(groundingEvents.map((e) => e.eventId));
+    let dropped = 0;
+    let danglingRefs = 0;
+    const kept: BeatAnnotation[] = [];
+
+    for (const a of annotations) {
+      if (!realIds.has(a.eventRef)) {
+        dropped += 1;
+        continue;
+      }
+      const filtered = a.groundingPointer.eventRefs.filter((ref) => realIds.has(ref));
+      danglingRefs += a.groundingPointer.eventRefs.length - filtered.length;
+      kept.push({
+        ...a,
+        groundingPointer: { eventRefs: filtered.length > 0 ? filtered : [a.eventRef] },
+      });
+    }
+
+    if (dropped > 0 || danglingRefs > 0) {
+      console.warn(
+        `claude-interpreter: dropped ${dropped} annotations + ${danglingRefs} dangling refs not in the event set.`,
+      );
+    }
+    return kept;
   }
 
   // Overwrite the two provenance fields with interpreter-authoritative values, then parse. The
