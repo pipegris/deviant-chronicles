@@ -1,8 +1,9 @@
 // Namespace import: Phaser 4's ESM build has no default export (verified) — `import Phaser` would be
 // undefined. This is the ONLY file (besides the scene/textures) that touches Phaser.Game config.
 import * as Phaser from 'phaser';
-import type { BattleState } from '../../schema/battle-timeline';
+import type { BattleState, Beat } from '../../schema/battle-timeline';
 import type { RenderPort } from '../render-port';
+import { planAnimations } from '../animation-plan';
 import { ArenaScene } from './arena-scene';
 import { DEFAULT_ASSET_MANIFEST } from './placeholder-textures';
 
@@ -88,6 +89,26 @@ export class PhaserRenderAdapter implements RenderPort {
       this.applyTo(scene, snapshot);
     } else {
       this.pending = snapshot; // still booting — the postBoot CREATE handler flushes the latest snapshot
+    }
+  }
+
+  // The one-way ANIMATED command (Story 2.4): run the TRANSITION prev->next. Computes the intent
+  // list via the PURE planAnimations (zero Phaser in that layer) and forwards it to the live scene's
+  // playAnimations. If the scene is still booting, buffer the `next` snapshot for the snap-flush —
+  // animations are PRESENTATION (the static state for `next` is the truth); snapping the latest
+  // state during boot is the correct fail-closed behavior (never drop the state, never queue motion
+  // that would play stale once boot finishes). Returns void — nothing flows back upstream (AC1).
+  renderTransition(prev: BattleState, next: BattleState, beats: Beat[]): void {
+    if (!this.game) {
+      console.warn('PhaserRenderAdapter.renderTransition() called before init(); transition ignored. Call init() first.');
+      return;
+    }
+    const scene = this.ready ? (this.game.scene.getScene('Arena') as ArenaScene | undefined) : undefined;
+    if (scene) {
+      // Compute intents render-side (pure) and run them; the next snapshot is implied by the tweens.
+      scene.playAnimations(planAnimations(prev, next, beats));
+    } else {
+      this.pending = next; // still booting — the postBoot flush snaps the latest state (no motion)
     }
   }
 

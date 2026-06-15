@@ -71,6 +71,12 @@ class FakeRenderAdapter implements RenderPort {
     this.received.push(snapshot);
   }
 
+  // The RenderPort gained the one-way renderTransition (Story 2.4, Option A). This Story 2.3 fake
+  // only exercises the SNAP path; a parameterless () => void is assignable to the interface's
+  // (prev, next, beats) => void, so it satisfies `implements RenderPort` without recording anything.
+  // (The Story 2.4 animated seam is proven in animation-transition.test.ts.)
+  renderTransition(): void {}
+
   destroy(): void {
     this.destroyCalls += 1;
   }

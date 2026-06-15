@@ -58,9 +58,12 @@ export function startArena(parent = 'game-container'): PhaserRenderAdapter {
   adapter.render(state.battleState); // show t=0
 
   // Wall-clock drive (render-side, NOT Layer-0): advance ~4 ticks/sec while frames remain, rendering
-  // state.battleState after each tick — the one-way data flow reducer -> RenderPort. Stops at the end
-  // (the held victory frame). This is the MINIMAL proof that playback drives the arena, not the 2.5
-  // controls loop. Guarded for environments without requestAnimationFrame (e.g. SSR/test).
+  // each tick via the ANIMATED path (Story 2.4): renderTransition(prevState, nextState, beatsAdvanced)
+  // — the one-way data flow reducer -> RenderPort. The boot computes beatsAdvanced =
+  // timeline.beats.slice(prev.cursor, next.cursor) (it holds the timeline; the cursor is on the
+  // snapshot), keeping planAnimations a PURE function the adapter consumes — nothing flows back
+  // upstream (R5). Stops at the end (the held victory frame). This is the MINIMAL drive (the 2.5
+  // controls loop is a later story). Guarded for environments without requestAnimationFrame.
   if (typeof requestAnimationFrame === 'function') {
     const stepMs = 250;
     let lastStep = 0;
@@ -68,8 +71,11 @@ export function startArena(parent = 'game-container'): PhaserRenderAdapter {
       if (now - lastStep >= stepMs) {
         lastStep = now;
         if (state.cursor < timeline.beats.length) {
+          const prev = state.battleState;
+          const prevCursor = state.cursor;
           state = reducer(state, { type: 'tick' });
-          adapter.render(state.battleState);
+          const beatsAdvanced = timeline.beats.slice(prevCursor, state.cursor);
+          adapter.renderTransition(prev, state.battleState, beatsAdvanced);
         }
       }
       if (state.cursor < timeline.beats.length) requestAnimationFrame(loop);

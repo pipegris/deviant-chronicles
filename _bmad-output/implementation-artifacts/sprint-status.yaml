@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-14T22:00:00Z
+last_updated: 2026-06-14T23:45:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -19,5 +19,6 @@ development_status:
   2-1: done
   2-2: done
   2-3: done
-  2-4: backlog
+  # 2-4 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Core combat animations (FR-7, NFR-1) on Story 2.3's renderer: a PURE src/render/animation-plan.ts mapping a playback transition (prev/next BattleState + the Beat[] that advanced the cursor) to animation INTENTS (Forgemaiden idle/forge-strike/cast/stagger/rise; Hammer-Flurry = melee Beat with sourceEventIds.length>1; stagger->rise coinciding with the gauge charge; Boss/Minion hit/death; bar/gauge tween deltas; Aether-Storm trigger) + a THIN Phaser consumer (ArenaScene.playAnimations + renderTransition seam, Option A) that runs the tweens/tints on placeholder rects. NOT controls UI (2.5), NOT cinematics (Epic 3), NOT final art (5.3). Gate-verified: the pure intent logic (incl. a real fixture walk), the fake-adapter one-way wiring, the headless Phaser boot smoke, R5 lint, build; golden snapshot UNCHANGED, no anthropic in dist (R4). Tests 32->35 files / 339->380. Fix round 1: R1 disclosed (AC2 rise unreachable at speed=1 — Honest-Gap; gauge charges only on counter, strikes flat-or-discharge, boot is speed=1 so a strike never coincides with a gauge rise), R2 strengthened (genuine-model-data rise test), R3 count corrected, R4/R5/R6 code fixes (intent-array copy / cached base color / from-seed+onUpdate), R7 deferred (cosmetic), R8 refuted. Operator-verified (NOT a gate): motion quality / 60fps (NFR-1) / "visibly faster" flurry / "defiance" rise / distinct overlay — watch pnpm dev. Honest gaps: flurry POSITIVE branch unit-proven only (fixture has no multi-source melee); AC2 rise unreachable at speed=1 (unit-proven on genuine data only); minion hit/death presentation-only (no per-minion HP in v0.1 BattleState). epic-2 stays in-progress.
+  2-4: done
   2-5: backlog
