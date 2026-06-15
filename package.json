@@ -11,6 +11,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "interpret:story-10-1": "jiti scripts/interpret.ts --transcript src/ingest/__fixtures__/sample-transcript.jsonl --journal src/ingest/__fixtures__/sample-journal.jsonl --stream-id aecfc998031eb0576 --out public/bundles/story-10-1.annotations.json",
     "bundle:story-10-1": "node -e \"console.log('bundle:story-10-1 not yet implemented (Epic 5, Story 5.2)'); process.exit(0)\""
   },
   "devDependencies": {

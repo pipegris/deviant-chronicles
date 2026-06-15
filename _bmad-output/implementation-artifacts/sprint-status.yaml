@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T02:30:00Z
+last_updated: 2026-06-15T03:00:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -71,7 +71,63 @@ development_status:
   # 42 files / 439 tests, build OK (no anthropic in dist, interpret/ tree-shaken), BOTH golden snapshots
   # (pace/+ingest/) byte-stable. No git commit. epic-3 stays in-progress.
   3-1: done
-  3-2: backlog
+  # 3-2 moved backlog -> ready-for-dev (create-story). Real frozen LLM Interpreter MACHINERY (FR-2,
+  # NFR-2/5, Layer 1), built + tested against a MOCKED @anthropic-ai/sdk — ZERO real network/spend, no
+  # real ANTHROPIC_API_KEY in dev/CI. ADDS src/interpret/{claude-interpreter.ts (ClaudeInterpreter
+  # implements the 3.1 BeatInterpreter; calls claude-sonnet-4-6 via FORCED tool_choice -> Zod-validated
+  # BeatAnnotation[]; INJECTABLE client seam for the mock; claude-opus-4-8 escalation = a model config
+  # knob; the ONLY SDK import here), freeze.ts (PURE canonicalJSON + annotationHash =
+  # sha256(normalizedEvents+interpreterVersion+promptVersion) + freezeAnnotations -> the Story-5.2 bundle
+  # seam; node:crypto only, SDK-FREE), eval.ts (PURE evaluateTagging quality scorer, SDK-FREE)} + thin
+  # scripts/{interpret.ts, eval-interpreter.ts} CLIs (argv/fs glue for the DEFERRED operator bake). The
+  # testable logic lives in src/interpret/ (NOT scripts/) because vitest include is src/**/*.test.ts.
+  # Reuses 3.1's BeatInterpreter interface (UNCHANGED, async by design) + FixtureInterpreter (REMAINS the
+  # CI double) + runIngest helper, and 1.2's BeatAnnotation/ReplayBundle.annotationHash. Gate-provable
+  # (no pixels): AC1 = mocked-client SDK->forced-tool->Zod pipeline (model=claude-sonnet-4-6, tool_choice
+  # forced, fail-loud on malformed); AC2 = freeze/hash determinism + canonicality (stable key order;
+  # identical inputs->same hash; changed event/interpreterVersion/promptVersion->different hash;
+  # frozen-then-reloaded byte-stable; groundings resolve); AC3 = pure eval scorer + structural proof it
+  # never gates CI (scripts/*.test.ts not in vitest include; not in package.json test/build). R4: SDK only
+  # in claude-interpreter.ts + scripts/ (eslint re-allows interpret/ so lint won't flag it — the real R4
+  # proof is grep -ril anthropic dist/ = NOTHING + a source-grep that freeze.ts/eval.ts are SDK-free).
+  # Gates: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts UNCHANGED), full suite green, BOTH golden
+  # snapshots (pace/+ingest/) byte-stable, build OK (interpret/+scripts/ tree-shaken from the browser
+  # bundle). The single real claude-sonnet-4-6 bake is a DEFERRED operator step (Epic 5/Story 5.2). NO git
+  # commit. epic-3 stays in-progress (3-2 is not the first story in epic-3).
+  # 3-2 ready-for-dev -> in-progress -> review (dev-story). Real frozen-LLM-interpreter MACHINERY (FR-2,
+  # NFR-2/5, Layer 1) built + tested against a MOCKED @anthropic-ai/sdk (ZERO real network/key in dev/CI).
+  # ADDS src/interpret/{claude-interpreter.ts (ClaudeInterpreter implements 3.1 BeatInterpreter; injectable
+  # AnthropicLike client; forced tool_choice -> Zod-validated BeatAnnotation[]; lazy SDK import so it stays
+  # tree-shaken from the browser; claude-opus-4-8 escalation = a model knob), freeze.ts (PURE canonicalJSON +
+  # annotationHash=sha256(normalizedEvents+interpreterVersion+promptVersion) + freezeAnnotations -> the
+  # Story-5.2 bundle seam; node:crypto only, SDK-free), eval.ts (PURE evaluateTagging scorer, SDK-free)} +
+  # thin scripts/{interpret.ts, eval-interpreter.ts} CLIs (argv/fs glue for the DEFERRED operator bake) +
+  # 3 *.unit.test.ts. Made the 4 ATDD red files green honestly — one documented test fix: the
+  # claude-interpreter.test "NO real network" source-grep was self-defeating (it matched the file's OWN
+  # AC-quoting comments + the assertions' own descriptions/argument literals, so it could never pass);
+  # rescoped it to strip comment lines + assert no real ESM import / no `new Anthropic(` in executable code
+  # (intent preserved + strengthened). The other 38 ATDD assertions unchanged. R4 PROVEN: grep -ril anthropic
+  # dist/ = NOTHING (interpret/+scripts/ browser-unreachable, tree-shaken) + freeze/eval source-grep SDK-free;
+  # eslint.config.ts UNTOUCHED (interpret/ is R4-re-allowed, so lint won't flag the SDK import in
+  # claude-interpreter.ts — by design). Gates GREEN: typecheck/lint clean (R1/R4/R5 hold), 49 files / 489
+  # tests (was 42/439), build OK, BOTH golden snapshots (pace/+ingest/) byte-stable. The single real
+  # claude-sonnet-4-6 bake stays a DEFERRED operator step (Epic 5/Story 5.2). NO git commit. epic-3 stays
+  # in-progress.
+  # 3-2 review -> done (senior-review fix round 1). Review APPROVED all 4 ACs; 1 high + 1 med + 5 low
+  # findings, ALL resolved (none refuted). F1 (high) was the only behavioral defect: per-annotation
+  # interpreterVersion + sourceHash were LLM-controlled (frozen verbatim) — now the interpreter STAMPS
+  # authoritative provenance post-parse (interpreterVersion = its configured id; sourceHash =
+  # sha256(canonicalJSON(grounded event slice))) and the two fields were dropped from the
+  # emit_beat_annotations tool required schema, so the content address is no longer model-forgeable and
+  # is consistent with annotationHash. F2 (doc: annotationHash is a run-identity key, NOT an
+  # annotation-integrity hash — AC2 formula UNCHANGED), F3 (no-network test also rejects
+  # require('@anthropic-ai/sdk')), F4 (canonicalJSON throws on undefined vs silent collapse), F5
+  # (freezeAnnotations throws on a dangling grounding ref), F6 (interpret CLI stderr billed-call notice),
+  # F7 (test count 489 -> 491). +10 tests. Gates GREEN: typecheck/lint clean (R1/R4/R5 hold,
+  # eslint.config.ts UNTOUCHED), 49 files / 501 tests, build OK (grep -ril anthropic dist/ = NOTHING;
+  # interpret/+scripts/ tree-shaken), BOTH golden snapshots (pace/+ingest/) byte-stable. No git commit.
+  # epic-3 stays in-progress (3-2 is not the Epic-3 capstone).
+  3-2: done
   3-3: backlog
   3-4: backlog
   3-5: backlog
