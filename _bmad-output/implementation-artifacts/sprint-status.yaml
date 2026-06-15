@@ -27,3 +27,10 @@ development_status:
   # 2-5 review -> done (senior-review fix round 1). F1 (med) fixed: destroy() now captures the rafId and cancelAnimationFrame()s the in-flight frame BEFORE tearing down adapter/controls, killing the perpetual uncancelled rAF loop (resource leak + use-after-destroy renderTransition on a destroyed adapter while playing) — pinned by a new regression test (37 files / 408 tests). F2 (doc count 405->407), F3 (boot test header reworded: jsdom DOES drive a live throttled loop; destroy() must cancel it), F4 (controls.test comment corrected: a string speed FAILS clampSpeed's finiteness guard -> falls back to 1, so Number() is what preserves the speed). F5 refuted (held-victory-frame no-op is INTENTIONAL v0.1 behavior per Dev Notes "IS NOT the closing-Saga"; auto-pause deferred to 4.2). epic-2 stays in-progress (operator flips epic-2 -> done as the capstone).
   # 2-5 fix round 2 (verifier rejection): the verifier's 3 failures were NOT code defects — they were (a)x2 the epic-2 capstone bookkeeping contradiction (point-1 epic-2=done vs point-7 epic-2=in-progress) and (b) the operator-only visual layout/feel, which the gate inherently cannot prove (honestly documented). Resolved per the authoritative instruction: 2-5 stays done, epic-2 stays in-progress (capstone deferred to operator — see the epic-2 comment above). All F1..F5 remain addressed/refuted; no source change needed. Gates re-run GREEN: typecheck/lint clean, 37 files / 408 tests, build OK, golden snapshot UNCHANGED (not in git-diff), no anthropic in dist (R1/R4/R5 hold).
   2-5: done
+  # Epic 3 — The Signature Beats (Layer 1 — Interpreted + Cinematics)
+  epic-3: in-progress
+  3-1: backlog
+  3-2: backlog
+  3-3: backlog
+  3-4: backlog
+  3-5: backlog
