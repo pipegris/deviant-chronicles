@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T11:00:00Z
+last_updated: 2026-06-15T13:30:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -506,8 +506,75 @@ development_status:
   # epic-4 -> done as the capstone, per the Epic-1/2/3 flip-post-senior-review precedent).
   4-4: done
   # Epic 5 — Showcase Delivery (Scrub -> Bundle -> Public URL)
+  # 5-1 moved backlog -> ready-for-dev (create-story). FIRST Epic-5 source story (the PRIVACY GUARDRAIL,
+  # architecture.md#Privacy&Security): a config-driven secret/PII scrub over the ingested Session + the
+  # PUBLISH GATE that Story 5.2's bundle build enforces. Since the public ReplayBundle carries real Story
+  # 10.1 transcript data and the fantasy/narration layers do NOT redact, this gates publishing. ADDS (all
+  # NEW/additive, no existing source edited): src/config/scrub-patterns.json (versioned deny-pattern set,
+  # config-as-data NFR-4: secret/token/credential/pii-email/home-path/db-role categories), src/scrub/
+  # scrub-patterns.ts (.strict() Zod loader compiling patterns->RegExp, fail-closed at load — the
+  # teaching-config/captions-config/model-tuning precedent), src/scrub/scrub.ts (PURE deterministic
+  # scrubSession(events)->{scrubbedEvents, report, scrubHash}: walks payload string leaves, replaces
+  # matches with «REDACTED:{category}» tokens, emits a manual-review report of redactions BY
+  # CATEGORY/COUNT + locations {eventId,jsonPath} + suspicious-unmatched candidates — NEVER a secret
+  # value; scrubHash=sha256(canonicalJSON(scrubbedEvents)+patternSetVersion) REUSING freeze.ts's
+  # canonicalJSON, node:crypto only), src/scrub/gate.ts (PURE isPublishable({scrubResult,approval})->{ok,
+  # reasons} + the ScrubApproval marker contract binding an approval to a specific scrubHash+reportHash —
+  # BLOCKS on null/stale/tampered/mismatched approval, PASSES only on a matching valid marker; the
+  # Story-5.2 wiring seam), scripts/scrub.ts (THIN offline argv/fs glue mirroring interpret.ts/scribe-saga.ts;
+  # untested — vitest include is src/**/*.test.ts so logic lives in src/scrub/, the 3.2 split), a
+  # planted-secret fixture + co-located scrub.test/gate.test/scrub-patterns.unit.test/r4-isolation.test +
+  # a package.json scrub:story-10-1 script (NOT in test/build/CI). MODULE-HOME decision: NEW src/scrub/
+  # (architecture names only scripts/scrub.ts, but vitest only runs src/**/*.test.ts -> testable logic must
+  # live in src/, the Story-3.2 thin-script/src-logic precedent); no eslint zone — global anthropic/phaser
+  # bans + the r4-isolation source-grep are the R4/R5 guard (eslint.config.ts UNTOUCHED). REPORT shape
+  # resolved on documented merits: counts-by-category + locations + candidates, NEVER values (the
+  # load-bearing privacy test: serialize report+scrubbed events, assert .not.toContain each planted
+  # secret). GATE contract resolved: pure clock-free predicate; the marker content-addresses the scrubbed
+  # output+report so a stale approval can't ship a changed session; ReplayBundle schema NOT edited (5.2
+  # adds bundle fields, the TuningConfigSchema forward-reference precedent). DATA-SOURCE REALITY: the FULL
+  # real session .sources/story-10-1/* (810 lines) is git-ignored/not in CI; the committed fixture (1.3) is
+  # the hand-redacted thin slice with NO planted secrets -> the GATE is proven against a NEW planted-secret
+  # fixture (the 3.2/3.4 honest-gap posture), and the real .sources scrub + the human review/approval are
+  # the DEFERRED operator step (the gate only enforces a valid marker EXISTS, it cannot prove a human read
+  # the report). GATE-VERIFIABLE: planted patterns redacted; report lists them by category/count with NO
+  # value leaked; the gate BLOCKS an unscrubbed/unreviewed bundle + PASSES a scrubbed+reviewed one; R4
+  # scrub SDK-free; determinism (same input -> same scrubbed output + report). PURE (R2-adjacent: no
+  # clock/RNG/network/IO in src/scrub/; fs lives in scripts/ glue). Gates: typecheck/lint clean (R1/R4/R5
+  # hold, eslint.config.ts UNCHANGED), full suite green (baseline 83 files at HEAD 6025447), build OK +
+  # grep -ril anthropic dist/ = NOTHING (src/scrub/ is browser-unreachable, tree-shaken), BOTH golden
+  # snapshots (pace/+ingest/) byte-stable (no Layer-0 code). NOT the bundle build (5.2), final art (5.3),
+  # or deploy (5.4). NO git commit (operator commits between stories). epic-5 stays in-progress (5-1 is the
+  # first Epic-5 story; epic-5 already in-progress, no epic flip triggered).
+  # 5-1 moved ready-for-dev -> in-progress -> review (dev-story). The PRIVACY GUARDRAIL: src/config/
+  # scrub-patterns.json (.strict() loader) + src/scrub/{scrub-patterns,scrub,gate}.ts (PURE config-driven
+  # redactor + manual-review report [category/count + locations + opaque-token candidates, NO value leaked] +
+  # the publish-gate predicate isPublishable bound to scrubHash+reportHash that Story 5.2 wires) + thin
+  # scripts/scrub.ts glue + a planted-secret fixture. Made the 4 ATDD red suites GREEN honestly (none
+  # weakened); +37 tests (83->87 files, 842->879 tests). Gates GREEN: typecheck/lint clean (eslint.config.ts
+  # UNCHANGED, R1/R4/R5 hold), build OK + grep -ril anthropic dist/ = NOTHING (src/scrub/ browser-unreachable,
+  # tree-shaken), BOTH golden snapshots (pace/+ingest/) byte-stable (no Layer-0 code). The real scrub over the
+  # git-ignored .sources/story-10-1/* + the human approval marker are the deferred operator step (Story 5.2
+  # wires the gate). NO git commit. epic-5 stays in-progress (5-1 is not the Epic-5 capstone).
+  # 5-1 review -> done (senior-review fix round 1, 2026-06-15). Approve-with-minor-fixes: 0 high / 2 med / 5
+  # low; all fix/consider findings addressed, R8/R9 refuted. R1 (med): redactions sort now CODEPOINT not
+  # localeCompare, so reportHash is host-independent (closes a cross-host approval-BLOCK footgun; no observable
+  # change for the 6 ASCII categories). R2 (med, consider->fixed): the gate self-validates the result —
+  # recomputes scrubHash from scrubbedEvents+report.patternSetVersion and BLOCKS on mismatch BEFORE trusting
+  # the approval (defense-in-depth vs a 5.2 caller hand-mutating scrubbedEvents while reusing the stale field).
+  # R3 (low): did NOT tighten password=\S+ (tightening was VERIFIED to leak the conn-string @host:port/db tail
+  # because password-assignment pre-empts connection-string-credential) -> documented the greedy fail-safe +
+  # added a password-literal-free conn-string fixture/test so connection-string-credential is exercised. R4
+  # (low): documented db-role as intentionally-aggressive fail-safe operator-review noise (narrowing would risk
+  # UNDER-redaction). R5 (low): home-path patterns now consume the path tail (/home/[^\s"']+ etc.) so
+  # .ssh/id_rsa residual signal is also redacted (strictly more private). R6 (low): walkValue preserves input
+  # key order (scrubHash stable via canonicalJSON re-sort). R7 (low): doc counts corrected. Behavioral fixes
+  # each gained a test; +4 tests. Golden inline snapshot re-baselined for R5/R6 (no value leak). Gates GREEN:
+  # typecheck/lint clean (eslint.config.ts UNTOUCHED, R1/R4/R5 hold), 87 files / 887 tests, build OK + grep -ril
+  # anthropic dist/ = NOTHING, BOTH golden snapshots (pace/+ingest/) byte-stable. NO git commit. epic-5 stays
+  # in-progress (5-1 is not the Epic-5 capstone).
   epic-5: in-progress
-  5-1: backlog
+  5-1: done
   5-2: backlog
   5-3: backlog
   5-4: backlog

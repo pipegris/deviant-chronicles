@@ -1,0 +1,71 @@
+{
+  "$schemaVersion": 1,
+  "patterns": [
+    {
+      "id": "api-key-sk",
+      "category": "token",
+      "pattern": "sk-[A-Za-z0-9_-]{16,}",
+      "description": "API key in the sk-… shape (e.g. an Anthropic/OpenAI-style secret key)"
+    },
+    {
+      "id": "bearer-token",
+      "category": "token",
+      "pattern": "Bearer\\s+[A-Za-z0-9._~+/=-]+",
+      "description": "Bearer authorization header value"
+    },
+    {
+      "id": "generic-high-entropy-secret",
+      "category": "secret",
+      "pattern": "(?:secret|token|api[_-]?key)[\"'\\s:=]+[A-Za-z0-9._-]{16,}",
+      "description": "A generic secret/token/api_key assignment with a high-entropy value"
+    },
+    {
+      "id": "password-assignment",
+      "category": "credential",
+      "pattern": "(?i:password)=\\S+",
+      "description": "Inline credential of the password=… form. The greedy \\S+ deliberately consumes the whole non-whitespace run (incl. a trailing @host:port/db when the credential sits in a connection string) — intentional FAIL-SAFE over-redaction: removing the credential AND its surrounding host context is privacy-preserving. The narrower connection-string-credential pattern covers the password-literal-free :user:pass@ form."
+    },
+    {
+      "id": "connection-string-credential",
+      "category": "credential",
+      "pattern": "://[^/\\s:@]+:[^/\\s:@]+@",
+      "description": "user:password@ credentials embedded in a connection string"
+    },
+    {
+      "id": "pii-email",
+      "category": "pii-email",
+      "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+      "description": "RFC-lite PII email address"
+    },
+    {
+      "id": "home-path-unix",
+      "category": "home-path",
+      "pattern": "/home/[^\\s\"']+",
+      "description": "Absolute Linux home path /home/<user>/… incl. the tail (consumes through the filename so .ssh/id_rsa-style residual signal is also redacted; stops at whitespace/quote)"
+    },
+    {
+      "id": "home-path-macos",
+      "category": "home-path",
+      "pattern": "/Users/[^\\s\"']+",
+      "description": "Absolute macOS home path /Users/<user>/… incl. the tail (stops at whitespace/quote)"
+    },
+    {
+      "id": "home-path-windows",
+      "category": "home-path",
+      "pattern": "[Cc]:\\\\Users\\\\[^\\s\"']+",
+      "description": "Absolute Windows home path C:\\Users\\<user>\\… incl. the tail (stops at whitespace/quote)"
+    },
+    {
+      "id": "db-role-postgres",
+      "category": "db-role",
+      "pattern": "\\bpostgres\\b",
+      "description": "DB role name allowlist entry: postgres. Intentionally an UNCONDITIONAL whole-word matcher — it redacts the bare word anywhere (incl. benign prose like 'the postgres cluster'), which is deliberate FAIL-SAFE over-redaction: a real DB-backed session's role mentions are privacy-relevant, and an over-redacted benign mention is operator-review noise, never a leak. Manual review (AC1) resolves the noise; never narrow this to a role= neighborhood, which would risk UNDER-redacting a real role."
+    },
+    {
+      "id": "db-role-app-rw",
+      "category": "db-role",
+      "pattern": "\\bapp_rw\\b",
+      "description": "DB role name allowlist entry: app_rw. Same intentionally-aggressive whole-word posture as db-role-postgres — over-redacts a benign mention rather than risk missing a real role (fail-safe operator-review noise, not a leak)."
+    }
+  ]
+}
