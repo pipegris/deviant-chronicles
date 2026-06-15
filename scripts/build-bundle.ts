@@ -8,10 +8,14 @@
 // test (vitest include is src/**/*.test.ts — the Story 3.2/5.1 thin-script precedent). It orchestrates
 // the AC1 pipeline verbatim: scrub → ingest → pace → interpret → saga → assemble → write.
 //
-// Usage (dev/CI, mocked LLM):
+// Usage (dev/CI, mocked LLM — the DEFAULT, no flag):
 //   jiti scripts/build-bundle.ts --transcript <path> --journal <path> --stream-id <id> \
 //     --out public/bundles/story-10-1.json --approval <dev-marker path> [--patterns <path>]
-// Usage (the DEFERRED operator bake — real claude-sonnet-4-6 interpret + claude-opus-4-8 saga):
+// Usage (the `claude -p` CLI bake — real interpret + saga, NO ANTHROPIC_API_KEY):
+//   jiti scripts/build-bundle.ts --cli --transcript <path> --journal <...> --stream-id <id> \
+//     --out public/bundles/story-10-1.json --approval <marker> [--model <id>] [...versions]
+//   (or BAKE_BACKEND=cli with no --cli flag)
+// Usage (the DEFERRED operator bake — real claude-sonnet-4-6 interpret + claude-opus-4-8 saga via SDK):
 //   jiti scripts/build-bundle.ts --real --transcript <real .sources path> --journal <...> \
 //     --stream-id <id> --out public/bundles/story-10-1.json --approval <real marker> \
 //     [--model <id>] [--interpreter-version <v>] [--prompt-version <v>]
@@ -95,6 +99,7 @@ async function main(argv: string[]): Promise<void> {
   const outPath = requireFlag(argv, 'out');
   const approvalPath = getFlag(argv, 'approval');
   const patternsPath = getFlag(argv, 'patterns');
+  const cli = hasFlag(argv, 'cli') || process.env.BAKE_BACKEND === 'cli';
   const real = hasFlag(argv, 'real');
   const model = getFlag(argv, 'model');
   const interpreterVersionFlag = getFlag(argv, 'interpreter-version');
@@ -134,22 +139,33 @@ async function main(argv: string[]): Promise<void> {
   let interpreterVersion: string;
   let promptVersion: string;
 
-  if (real) {
-    // The DEFERRED operator bake — the ONLY real claude-sonnet-4-6 + claude-opus-4-8 calls. Lazily
-    // imported so the SDK is never on the dev/CI path (R4). The SAME lazy-SDK + BILLED-call-notice
-    // pattern scripts/interpret.ts + scripts/scribe-saga.ts use.
+  if (cli || real) {
+    // Real interpret + saga over the scrubbed events. Lazily imported so neither @anthropic-ai/sdk
+    // nor node:child_process is ever on the default dev/CI path (R4). --cli injects the key-free
+    // `claude -p` adapter; --real falls back to ClaudeInterpreter/SagaAuthor's lazy SDK client.
     const { ClaudeInterpreter } = await import('../src/interpret/claude-interpreter');
     const { SagaAuthor } = await import('../src/scribe/saga-author');
+    let client: import('../src/llm/claude-cli-client').AnthropicLike | undefined;
+    if (cli) {
+      const { ClaudeCliClient } = await import('../src/llm/claude-cli-client');
+      client = new ClaudeCliClient();
+      process.stderr.write(
+        'scripts/build-bundle.ts --cli: authoring interpret + saga via `claude -p` ' +
+          '(no ANTHROPIC_API_KEY).\n',
+      );
+    } else {
+      process.stderr.write(
+        'scripts/build-bundle.ts --real: about to make REAL, BILLED Anthropic calls (interpret + saga) ' +
+          'over the resolved ANTHROPIC_API_KEY — the deferred operator bake, never run in dev/CI.\n',
+      );
+    }
     const interpreter = new ClaudeInterpreter({
+      client,
       model,
       interpreterVersion: interpreterVersionFlag,
       promptVersion: promptVersionFlag,
     });
-    const author = new SagaAuthor({ model, promptVersion: promptVersionFlag });
-    process.stderr.write(
-      'scripts/build-bundle.ts --real: about to make REAL, BILLED Anthropic calls (interpret + saga) ' +
-        'over the resolved ANTHROPIC_API_KEY — the deferred operator bake, never run in dev/CI.\n',
-    );
+    const author = new SagaAuthor({ client, model, promptVersion: promptVersionFlag });
     annotations = await interpreter.interpret(scrubResult.scrubbedEvents);
     saga = await author.authorSaga(scrubResult.scrubbedEvents);
     interpreterVersion = interpreter.interpreterVersion;
@@ -201,7 +217,7 @@ async function main(argv: string[]): Promise<void> {
       `Annotations: ${bundle.annotations.length}\n` +
       `annotationHash: ${bundle.annotationHash}\n` +
       `bundleHash: ${bundleHash(bundle)}\n` +
-      `Saga: ${real ? 'real (claude-opus-4-8 bake)' : 'PLACEHOLDER (deferred real bake)'}\n` +
+      `Saga: ${cli ? 'real (claude -p CLI bake)' : real ? 'real (claude-opus-4-8 SDK bake)' : 'PLACEHOLDER (deferred real bake)'}\n` +
       `Publish gate: PASSED (scrubbed + approved)\n`,
   );
 }

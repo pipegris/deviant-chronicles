@@ -1,24 +1,44 @@
-// OFFLINE OPERATOR STEP — requires ANTHROPIC_API_KEY (see .env.example); NOT run in dev/CI.
-// The browser reader is src/scribe/saga.ts (SDK-free). This is the thin argv/fs/stdout glue for the
-// DEFERRED real bake (Epic 5 / Story 5.2 bundle assembly): it runs the real SagaAuthor over a
-// session's NormalizedEvent[], authors ONE lush Tolkien-register Saga via claude-opus-4-8, and writes
-// the Saga text to disk as the artifact Story 5.2 folds into ReplayBundle.saga.
+// OFFLINE authoring step. The browser reader is src/scribe/saga.ts (SDK-free). The thin argv/fs/stdout
+// glue that authors ONE lush Tolkien-register Saga over a session's NormalizedEvent[] and writes the
+// Saga text to disk as the artifact Story 5.2 folds into ReplayBundle.saga.
 //
-// ALL testable logic lives in src/scribe/saga-author.ts (which `pnpm test` runs); this file carries
-// no logic worth a unit test. Re-running is an explicit manual step, never CI. Usage:
+// BACKEND SELECTOR (CI-safe by default):
+//   (no flag)  the PLACEHOLDER Saga — NO LLM, NO key, NO network (the dev/CI path).
+//   --cli      inject the ClaudeCliClient into SagaAuthor — the `claude -p` CLI bake (no key).
+//   --real     the lazy-SDK SagaAuthor — the deferred, BILLED ANTHROPIC_API_KEY bake.
+// Or set BAKE_BACKEND=cli to select the CLI backend without the flag.
+//
+// ALL testable logic lives in src/scribe/saga-author.ts + src/llm/ (which `pnpm test` runs); this
+// file carries no logic worth a unit test. Usage:
 //   jiti scripts/scribe-saga.ts --transcript <path> --journal <path> --stream-id <id> \
-//     --out <path> [--model claude-opus-4-8] [--prompt-version <v>]
+//     --out <path> [--cli | --real] [--model <id>] [--prompt-version <v>]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { NormalizedEvent } from '../src/schema/normalized-event';
 import { parseTranscript } from '../src/ingest/parse-transcript';
 import { parseJournal } from '../src/ingest/parse-journal';
 import { normalizeTranscript, normalizeJournal } from '../src/ingest/normalize';
 import { mergeStreams } from '../src/ingest/merge';
-import { SagaAuthor } from '../src/scribe/saga-author';
+
+// Default saga model for the CLI/real bakes — claude-opus-4-8 is accepted by `claude --model`
+// verbatim. Mirrors SagaAuthor's own DEFAULT_MODEL so stdout/notices are accurate.
+const DEFAULT_SAGA_MODEL = 'claude-opus-4-8';
+
+// The mocked-path placeholder Saga (matches build-bundle.ts) — a stand-in, NOT authored prose, so the
+// default CI path needs no LLM/key. The --cli/--real bakes replace it with the lush claude-opus-4-8 Saga.
+const PLACEHOLDER_SAGA =
+  '«PLACEHOLDER SAGA — the real claude-opus-4-8 bake over the full scrubbed session is the deferred ' +
+  'operator step. Run with --cli (claude -p, no key) or --real (ANTHROPIC_API_KEY) to author it.»';
+
+const DEFAULT_PROMPT_VERSION = 'saga-tolkien-v1';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 && i + 1 < argv.length ? argv[i + 1] : undefined;
+}
+
+function hasFlag(argv: string[], name: string): boolean {
+  return argv.includes(`--${name}`);
 }
 
 function requireFlag(argv: string[], name: string): string {
@@ -29,13 +49,50 @@ function requireFlag(argv: string[], name: string): string {
   return value;
 }
 
+// Resolve { saga, promptVersion } per backend. The SagaAuthor (and its SDK/CLI clients) is lazily
+// imported ONLY on --cli/--real, so the default path pulls in no @anthropic-ai/sdk or node:child_process.
+async function authorSaga(
+  events: NormalizedEvent[],
+  opts: { cli: boolean; real: boolean; model?: string; promptVersion?: string },
+): Promise<{ saga: string; promptVersion: string }> {
+  if (opts.cli) {
+    const { SagaAuthor } = await import('../src/scribe/saga-author');
+    const { ClaudeCliClient } = await import('../src/llm/claude-cli-client');
+    process.stderr.write(
+      `scripts/scribe-saga.ts --cli: authoring the Saga via \`claude -p\` ` +
+        `(model ${opts.model ?? DEFAULT_SAGA_MODEL}, no ANTHROPIC_API_KEY).\n`,
+    );
+    const author = new SagaAuthor({
+      client: new ClaudeCliClient(),
+      model: opts.model,
+      promptVersion: opts.promptVersion,
+    });
+    return { saga: await author.authorSaga(events), promptVersion: author.promptVersion };
+  }
+
+  if (opts.real) {
+    const { SagaAuthor } = await import('../src/scribe/saga-author');
+    process.stderr.write(
+      `scripts/scribe-saga.ts --real: about to make a REAL, BILLED Anthropic call ` +
+        `(model ${opts.model ?? DEFAULT_SAGA_MODEL}) over the resolved ANTHROPIC_API_KEY.\n`,
+    );
+    const author = new SagaAuthor({ model: opts.model, promptVersion: opts.promptVersion });
+    return { saga: await author.authorSaga(events), promptVersion: author.promptVersion };
+  }
+
+  // Default (CI-safe): the placeholder — no LLM, no key, no network.
+  return { saga: PLACEHOLDER_SAGA, promptVersion: opts.promptVersion ?? DEFAULT_PROMPT_VERSION };
+}
+
 async function main(argv: string[]): Promise<void> {
   const transcriptPath = requireFlag(argv, 'transcript');
   const journalPath = requireFlag(argv, 'journal');
   const streamId = requireFlag(argv, 'stream-id');
   const outPath = requireFlag(argv, 'out');
   const model = getFlag(argv, 'model');
-  const promptVersion = getFlag(argv, 'prompt-version');
+  const promptVersionFlag = getFlag(argv, 'prompt-version');
+  const cli = hasFlag(argv, 'cli') || process.env.BAKE_BACKEND === 'cli';
+  const real = hasFlag(argv, 'real');
 
   // Anti-corruption: ingest parses + Zod-validates the raw JSONL; the author consumes the validated
   // NormalizedEvent[] only (R3). Journal events are sequenced just after the dev stream. This is the
@@ -50,20 +107,17 @@ async function main(argv: string[]): Promise<void> {
   const journal = normalizeJournal(parseJournal(readFileSync(journalPath, 'utf8')), devMaxEpoch + 1);
   const events = mergeStreams([transcript, journal]);
 
-  // No injected client → SagaAuthor lazily constructs the real SDK client (reads ANTHROPIC_API_KEY
-  // from env). THIS is the single real call — the deferred operator step.
-  const author = new SagaAuthor({ model, promptVersion });
-  // Loud heads-up before the lazy `new Anthropic()` — this is a real, BILLED Anthropic call (F6).
-  process.stderr.write(
-    `scripts/scribe-saga.ts: about to make a REAL, BILLED Anthropic call (model ${model ?? 'claude-opus-4-8'}) ` +
-      'over the resolved ANTHROPIC_API_KEY — the deferred operator bake, never run in dev/CI.\n',
-  );
-  const saga = await author.authorSaga(events);
+  const { saga, promptVersion } = await authorSaga(events, {
+    cli,
+    real,
+    model,
+    promptVersion: promptVersionFlag,
+  });
 
   // Write the Saga text as the artifact Story 5.2 folds into ReplayBundle.saga. JSON-stringify the
   // bare string so the on-disk form round-trips byte-stable into the bundle field (a plain string).
   writeFileSync(outPath, `${JSON.stringify(saga, null, 2)}\n`, 'utf8');
-  process.stdout.write(`Wrote a ${saga.length}-char Saga (prompt ${author.promptVersion}) to ${outPath}\n`);
+  process.stdout.write(`Wrote a ${saga.length}-char Saga (prompt ${promptVersion}) to ${outPath}\n`);
 }
 
 // Run only when invoked directly (never on import). Tests never import this file.
