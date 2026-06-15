@@ -9,18 +9,17 @@ import { ReplayBundleSchema, type ReplayBundle } from './replay-bundle';
 
 const validOrderKey = { logicalClock: 0, streamId: 'main', seqWithinStream: 0 };
 
-const validNormalizedEvent = {
+// dev-story re-point (Story 5.5): the bundle ships the PAYLOAD-FREE projection (`projectedEvents`), not
+// the full `normalizedEvents`. This Story 1.2 fixture is updated to a valid ProjectedEvent (the five-key
+// payload-free shape + opaque identity). The composition/round-trip/reject assertions below are unchanged
+// in INTENT — they now exercise the projected leaf instead of the full event.
+const validProjectedEvent = {
   orderKey: validOrderKey,
   eventId: 'evt-0001',
   eventType: 'tool_use',
   toolName: 'Edit',
-  subtype: null,
-  timestamp: '2026-06-14T14:55:00.000Z',
-  streamDepth: 0,
-  exitCode: 0,
-  isError: false,
-  retryCount: 0,
-  payload: { filePath: 'src/main.ts' },
+  outcome: 'success',
+  role: 'source',
 };
 
 const validBeat = {
@@ -40,12 +39,12 @@ const validAnnotation = {
   groundingPointer: { eventRefs: ['evt-0001'] },
 };
 
-// Architecture bundle composition: normalized events + frozen annotations + tuning
+// Architecture bundle composition: projected (payload-free) events + frozen annotations + tuning
 // config + saga + asset manifest + schemaVersion + annotationHash, with the paced
 // battleTimeline baked in (Dev Notes "ReplayBundle composition" — determinism literal).
 const validBundle = {
   schemaVersion: 1,
-  normalizedEvents: [validNormalizedEvent],
+  projectedEvents: [validProjectedEvent],
   annotations: [validAnnotation],
   battleTimeline: {
     schemaVersion: 1,
@@ -61,11 +60,11 @@ const validBundle = {
 describe('Story 1.2 / AC1+AC4 — ReplayBundleSchema const + ReplayBundle type', () => {
   it('parses a minimal valid bundle and exposes the inferred ReplayBundle type', () => {
     // AC1: reading the composed fields back off the parsed value proves the bundle
-    // contract carries the architecture-named fields (schemaVersion, normalizedEvents,
+    // contract carries the architecture-named fields (schemaVersion, projectedEvents,
     // annotations, tuningConfig, saga, assetManifest, annotationHash).
     const value: ReplayBundle = ReplayBundleSchema.parse(validBundle);
     expect(value.schemaVersion).toBe(1);
-    expect(value.normalizedEvents).toHaveLength(1);
+    expect(value.projectedEvents).toHaveLength(1);
     expect(value.annotations).toHaveLength(1);
     expect(value.tuningConfig).toEqual({ someRule: 'value' });
     expect(value.assetManifest).toEqual({ hero: 'assets/hero.png' });
@@ -108,14 +107,33 @@ describe('Story 1.2 / AC4 — bundle rejects malformed input with a ZodError', (
     );
   });
 
-  it('throws when a nested normalizedEvent is malformed (non-integer logicalClock)', () => {
+  it('throws when a nested projectedEvent is malformed (non-integer logicalClock)', () => {
     const bad = {
       ...validBundle,
-      normalizedEvents: [
-        { ...validNormalizedEvent, orderKey: { ...validOrderKey, logicalClock: 1.5 } },
+      projectedEvents: [
+        { ...validProjectedEvent, orderKey: { ...validOrderKey, logicalClock: 1.5 } },
       ],
     };
     expect(() => ReplayBundleSchema.parse(bad)).toThrow(z.ZodError);
+  });
+
+  // Review F2 — the envelope is .strict(): a regression that re-introduced the OLD leak vector
+  // (a top-level `normalizedEvents`, full payloads) at the bundle root must FAIL LOUD at the parse
+  // boundary, not be silently STRIPPED (Zod's non-strict default would drop it without error). This
+  // mirrors the per-event ProjectedEventSchema.strict() rationale (Dev Notes §2) as defense-in-depth
+  // for NFR-3 (the privacy guardrail). Asserting it here pins the guarantee against a future regression.
+  it('throws on a stray top-level key (strict envelope rejects re-introduced normalizedEvents)', () => {
+    const withLeak = {
+      ...validBundle,
+      normalizedEvents: [{ payload: { text: 'a re-introduced raw payload' } }],
+    };
+    expect(() => ReplayBundleSchema.parse(withLeak)).toThrow(z.ZodError);
+  });
+
+  it('throws on ANY unknown top-level key (strict envelope)', () => {
+    expect(() => ReplayBundleSchema.parse({ ...validBundle, unexpectedField: true })).toThrow(
+      z.ZodError,
+    );
   });
 });
 

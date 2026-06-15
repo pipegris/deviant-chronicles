@@ -30,11 +30,14 @@ describe('Story 5.2 — the committed public/bundles/story-10-1.json is a valid 
     expect(() => ReplayBundleSchema.parse(committedBundleRaw())).not.toThrow();
   });
 
-  it('carries the baked timeline, scrubbed events, frozen annotations, and a (placeholder) Saga', () => {
+  it('carries the baked timeline, the payload-free projected events, frozen annotations, and a (placeholder) Saga', () => {
     const bundle = ReplayBundleSchema.parse(committedBundleRaw());
     expect(bundle.schemaVersion).toBe(1);
     expect(bundle.battleTimeline.beats.length).toBeGreaterThan(0);
-    expect(bundle.normalizedEvents.length).toBeGreaterThan(0);
+    // dev-story re-point (Story 5.5): the bundle ships `projectedEvents` (payload-free), not the full
+    // `normalizedEvents`. The byte-absence + five-key + bounded-size proofs live in the dedicated
+    // committed-bundle.payload-free.test.ts (AC1/AC2); here we pin the composition + provenance + hashes.
+    expect(bundle.projectedEvents.length).toBeGreaterThan(0);
     expect(bundle.annotations.length).toBeGreaterThan(0);
     // The committed dev bundle carries the placeholder Saga (the deferred real bake replaces it).
     expect(bundle.saga).not.toBeNull();

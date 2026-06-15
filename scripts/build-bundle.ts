@@ -213,7 +213,7 @@ async function main(argv: string[]): Promise<void> {
   // ── stdout: event count, the two hashes, and the gate verdict. NEVER a secret value.
   process.stdout.write(
     `Assembled ReplayBundle → ${outPath}\n` +
-      `Public events (scrubbed): ${bundle.normalizedEvents.length}\n` +
+      `Public events (projected, payload-free): ${bundle.projectedEvents.length}\n` +
       `Annotations: ${bundle.annotations.length}\n` +
       `annotationHash: ${bundle.annotationHash}\n` +
       `bundleHash: ${bundleHash(bundle)}\n` +

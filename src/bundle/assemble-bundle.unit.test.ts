@@ -107,7 +107,8 @@ describe('Story 5.2 / Task 2 unit — bundleHash is canonical (insertion-order-i
         tuningConfig: bundle.tuningConfig,
         battleTimeline: bundle.battleTimeline,
         annotations: bundle.annotations,
-        normalizedEvents: bundle.normalizedEvents,
+        // dev-story re-point (Story 5.5): the bundle field is `projectedEvents`, not `normalizedEvents`.
+        projectedEvents: bundle.projectedEvents,
         schemaVersion: bundle.schemaVersion,
       }),
     ) as ReplayBundle;

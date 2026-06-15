@@ -19,14 +19,14 @@ import { readSaga } from './saga';
 // RECORDED CHOICE (story Task 5 "build the fixture by ReplayBundleSchema.parse(...) — or a minimal
 // typed literal if a full valid bundle is heavy; record the choice"): we build the fixture via the
 // REAL ReplayBundleSchema.parse so the test exercises the actual schema, kept MINIMAL — empty
-// normalizedEvents/annotations/beats/records (all schema-legal: the array/record fields have no .min,
+// projectedEvents/annotations/beats/records (all schema-legal: the array/record fields have no .min,
 // battleTimeline allows an empty beats array). The ONLY field under test is `saga`; everything else is
-// a valid skeleton. This avoids hand-rolling a full NormalizedEvent[]/BeatAnnotation[] while still
-// proving the reader against the genuine schema. [src/schema/replay-bundle.ts L12-29]
+// a valid skeleton. dev-story (Story 5.5): the per-event field is `projectedEvents` (payload-free), not
+// `normalizedEvents`; empty is still schema-legal. [src/schema/replay-bundle.ts]
 function makeBundle(saga: string | null): ReplayBundle {
   return ReplayBundleSchema.parse({
     schemaVersion: 1,
-    normalizedEvents: [],
+    projectedEvents: [],
     annotations: [],
     battleTimeline: { schemaVersion: 1, beats: [], totalDurationMs: 0 },
     tuningConfig: {},

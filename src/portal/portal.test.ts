@@ -62,7 +62,11 @@ function runIngest(): NormalizedEvent[] {
 
 // The committed read-only overlay (events side-by-side with the FixtureInterpreter's annotations) —
 // the EXACT `view: AnnotatedView` arena-boot.ts builds at boot (applyOverlay(events, fixtureAnnotations())).
-function committedView(): AnnotatedView {
+// dev-story (Story 5.5): AnnotatedView is now generic in its event element; annotate <NormalizedEvent>
+// so resolveGrounding here returns the FULL events these Story 4.4 assertions read (toolName/eventType).
+// This suite resolves over the full Layer-0 events (bake-time view); the abstracted-projection grounding
+// is covered separately in abstracted-grounding.test.ts. No behavior changed — only the explicit type arg.
+function committedView(): AnnotatedView<NormalizedEvent> {
   return applyOverlay(runIngest(), fixtureAnnotations());
 }
 

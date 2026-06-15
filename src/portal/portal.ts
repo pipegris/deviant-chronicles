@@ -1,7 +1,9 @@
-import type { NormalizedEvent } from '../schema/normalized-event';
 import type { BeatAnnotation, BeatType } from '../schema/beat-annotation';
 import type { AnnotatedView } from '../interpret/overlay';
+import type { Outcome, ProjectedEvent } from '../schema/replay-bundle';
+import type { AbstractedRole } from '../bundle/classify-role';
 import { LEGEND } from './legend-config';
+import { TEACHING } from './teaching-config';
 
 // portal — the PURE, phaser-free transparency-portal core (FR-11, UJ-2): the ON-DEMAND Legend's
 // coverage surface + the grounding RESOLVER, the on-demand sibling of the Story 4.3 always-on teaching
@@ -78,10 +80,12 @@ export function getLegendEntries(): LegendEntry[] {
 // This is a DIFFERENT boundary from the replay-time fail-closed-to-default (an unmapped untrusted EVENT
 // gets a neutral idle beat); a frozen-overlay dangling ref is corruption. Do NOT "fix" this to a silent
 // skip. [story Dev Notes #4; architecture.md#fail-loud L280-281]
-export function resolveGrounding(
+// Story 5.5: generic in the view's element E (constrained to `{ eventId }`) so it resolves over EITHER
+// the full Layer-0 events (bake-time callers) or the payload-free projection the browser now carries.
+export function resolveGrounding<E extends { eventId: string }>(
   annotation: BeatAnnotation,
-  view: AnnotatedView,
-): readonly NormalizedEvent[] {
+  view: AnnotatedView<E>,
+): readonly E[] {
   return annotation.groundingPointer.eventRefs.map((ref) => {
     const event = view.events.find((e) => e.eventId === ref);
     if (!event) {
@@ -101,11 +105,46 @@ export function resolveGrounding(
 // The load-bearing pure unit is resolveGrounding; this just picks the active beat's annotation for the
 // renderer's "active beat -> real event(s)" grounding section. PURE + read-only. [story Task 2 "(Optional
 // helper) resolveActiveBeatGrounding"]
-export function resolveActiveBeatGrounding(
-  view: AnnotatedView,
+export function resolveActiveBeatGrounding<E extends { eventId: string }>(
+  view: AnnotatedView<E>,
   beatType: BeatType,
-): readonly NormalizedEvent[] | null {
+): readonly E[] | null {
   const annotation = view.annotations.find((a) => a.beatType === beatType);
   if (!annotation) return null;
   return resolveGrounding(annotation, view);
+}
+
+// Story 5.5 / Task 4 (AC4) — the ABSTRACTED grounding row the transparency portal shows for a beat:
+// tool + coarse role + per-event outcome + the teaching concept. NO raw event, NO file/symbol name, NO
+// transcript — accurate to the real Event only at the ABSTRACTED level. This is what the public portal
+// grounds to now (the verbatim "sight-beyond-sight" deep-dive is a DEFERRED local-only mode — NOT built;
+// there is no code path from the public bundle to a raw transcript, since none ships). [Dev Notes §6]
+export type AbstractedGrounding = {
+  tool: string | null;
+  role: AbstractedRole;
+  outcome: Outcome;
+  concept: string;
+};
+
+// resolveAbstractedGrounding — the AC4 core. Maps a beat's groundingPointer.eventRefs → the PROJECTED
+// events (by eventId, in eventRefs order) → the abstracted {tool, role, outcome, concept} rows. `tool` =
+// the projected toolName; `role`/`outcome` = the projected fields; `concept` = the teaching one-liner for
+// the annotation's beatType, REUSED from the Story 4.3 teaching.json (the plain-dev lesson — exactly the
+// "teaching concept" register AC4 wants; NO invented copy, Dev Notes §6). It requires the view to carry
+// ProjectedEvent (the abstracted fields live there, not on a bare NormalizedEvent), which the browser
+// boot threads from bundle.projectedEvents.
+//
+// FAIL LOUD on a dangling ref (the existing resolveGrounding policy — a frozen-overlay invariant
+// violation; do NOT silent-skip). PURE + read-only: builds fresh rows, mutates neither input.
+export function resolveAbstractedGrounding(
+  annotation: BeatAnnotation,
+  view: AnnotatedView<ProjectedEvent>,
+): readonly AbstractedGrounding[] {
+  const concept = TEACHING[annotation.beatType];
+  return resolveGrounding(annotation, view).map((event) => ({
+    tool: event.toolName,
+    role: event.role,
+    outcome: event.outcome,
+    concept,
+  }));
 }

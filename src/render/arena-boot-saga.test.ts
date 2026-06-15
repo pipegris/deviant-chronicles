@@ -85,7 +85,8 @@ const INJECTED_SAGA =
 function makeBundle(saga: string | null): ReplayBundle {
   return ReplayBundleSchema.parse({
     schemaVersion: 1,
-    normalizedEvents: [],
+    // dev-story re-point (Story 5.5): the bundle ships `projectedEvents` (payload-free); empty is legal.
+    projectedEvents: [],
     annotations: [],
     battleTimeline: { schemaVersion: 1, beats: [], totalDurationMs: 0 },
     tuningConfig: {},

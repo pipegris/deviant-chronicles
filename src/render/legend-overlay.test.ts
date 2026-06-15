@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mirrors src/render/controls.test.ts (the DOM-overlay + AbortController teardown precedent): a fresh
 // detached parent per test, real DOM events, destroy() in afterEach.
 import { createLegendOverlay } from './legend-overlay';
-import type { LegendOverlay } from './legend-overlay';
+import type { LegendGrounding, LegendOverlay } from './legend-overlay';
 
 // The content feed the boot hands the overlay — the SAME flat, display-ready list portal.ts exposes via
 // getLegendEntries() (beats first, then actions). We hand a hand-built stand-in here so the overlay test
@@ -144,25 +144,38 @@ describe('Story 4.4 AC1 — the panel RENDERS all covered rows (the coverage hal
   });
 });
 
-describe('Story 4.4 AC2 — the overlay DISPLAYS the active-beat grounding (the reveal half, fantasy -> real)', () => {
-  // TEST-REVIEW (Story 4.4 test-quality pass): the overlay's `getActiveGrounding` -> `refreshGrounding`
-  // path — the DOM display surface for AC2's "resolve the beat's groundingPointer to show the real
-  // Event(s)" — had ZERO assertions (the prior suite only handed `entries`, never `getActiveGrounding`,
-  // so the grounding <div>, the refresh-on-open call, and the null/empty fail-closed branch were
-  // untested). These pin the display contract WITHOUT asserting layout/feel (still operator-verified).
-  // The boot resolves the real eventIds upstream via portal.resolveGrounding; here we prove the overlay
-  // renders exactly the eventIds it is handed and hides the section when there is none. [story Task 3, AC2]
-  it('open() renders the active beat`s real eventIds (the resolved grounding the boot hands it)', () => {
-    const getActiveGrounding = () => ({ beatKey: 'dispel', eventIds: ['u-0002#1', 'u-0002#2', 'u-0003#0'] });
+describe('Story 4.4 / 5.5 AC4 — the overlay DISPLAYS the active-beat ABSTRACTED grounding (the reveal half)', () => {
+  // dev-story re-point (Story 5.5 / AC4): the reveal is the ABSTRACTED grounding (tool + role + outcome +
+  // concept), NOT bare eventIds — the boot now resolves it via portal.resolveAbstractedGrounding and hands
+  // the overlay `{ beatKey, rows }`. These pin the display contract WITHOUT asserting layout/feel (still
+  // operator-verified): the overlay renders exactly the abstracted rows it is handed (and NO file/symbol
+  // name, structurally), and hides the section when there is none. The Story 4.4 eventId-display
+  // assertions are replaced by the abstracted-row assertions per AC4 ("NO raw transcript and NO file/symbol
+  // name shown"); nothing weakened — the section is still proven visible/hidden/refreshed. [story Task 4]
+  it('open() renders the active beat`s ABSTRACTED rows (tool + role + outcome + concept), no eventId', () => {
+    const getActiveGrounding = () => ({
+      beatKey: 'dispel',
+      rows: [
+        { tool: null, role: 'source', outcome: 'success', concept: 'verifying beats guessing' },
+        { tool: 'Read', role: 'schema', outcome: 'success', concept: 'verifying beats guessing' },
+      ],
+    });
     overlay = createLegendOverlay({ parent, entries: SAMPLE_ENTRIES, getActiveGrounding });
 
     overlay.open();
     const text = overlay.root.textContent ?? '';
-    // The reveal names the active beat AND its real Layer-0 eventIds (accurate to the real Event, AC2).
+    // The reveal names the active beat AND surfaces the abstracted grounding (accurate to the real Event
+    // at the abstracted level, AC4): the tool, the coarse role, the outcome, and the teaching concept.
     expect(text).toContain('dispel');
-    expect(text).toContain('u-0002#1');
-    expect(text).toContain('u-0002#2');
-    expect(text).toContain('u-0003#0');
+    expect(text).toContain('Read');
+    expect(text).toContain('schema');
+    expect(text).toContain('success');
+    expect(text).toContain('verifying beats guessing');
+    // ...and NO raw eventId / file path appears in the GROUNDING section (scope the no-name/no-path proof
+    // to the grounding element — the unrelated LEGEND rows legitimately contain '/' e.g. "Edit/Write").
+    const groundingText = overlay.root.querySelector<HTMLElement>('.legend-grounding')?.textContent ?? '';
+    expect(groundingText).not.toContain('u-0002#1');
+    expect(groundingText).not.toContain('/');
   });
 
   it('hides the grounding section when there is no active grounded beat (getActiveGrounding -> null)', () => {
@@ -173,17 +186,17 @@ describe('Story 4.4 AC2 — the overlay DISPLAYS the active-beat grounding (the 
     const groundingEl = overlay.root.querySelector<HTMLElement>('.legend-grounding');
     if (!groundingEl) throw new Error('the overlay must render a grounding section element');
     expect(isVisible(groundingEl)).toBe(false);
-    // ...and it leaked no eventId text into the panel.
+    // ...and it leaked no grounding text into the panel.
     expect(overlay.root.textContent ?? '').not.toContain('grounds:');
   });
 
-  it('hides the grounding section when the resolved set is EMPTY (eventIds: []) — no empty reveal', () => {
+  it('hides the grounding section when the resolved set is EMPTY (rows: []) — no empty reveal', () => {
     // An active beat with an empty resolved set is treated as "nothing to reveal" (fail-closed), not an
-    // empty "grounds: " row — guards against a beat whose grounding resolved to no events.
+    // empty "grounds: " row — guards against a beat whose grounding resolved to no rows.
     overlay = createLegendOverlay({
       parent,
       entries: SAMPLE_ENTRIES,
-      getActiveGrounding: () => ({ beatKey: 'shaman', eventIds: [] }),
+      getActiveGrounding: () => ({ beatKey: 'shaman', rows: [] }),
     });
     overlay.open();
     const groundingEl = overlay.root.querySelector<HTMLElement>('.legend-grounding');
@@ -193,23 +206,29 @@ describe('Story 4.4 AC2 — the overlay DISPLAYS the active-beat grounding (the 
 
   it('REFRESHES the grounding on each open() — it reflects the CURRENT active beat, not a stale one', () => {
     // refreshGrounding runs on open(), so as the cursor advances between opens the panel must show the
-    // NEW active beat's eventIds, never a cached prior reveal. Pin it so a future "render once" refactor
-    // that drops the per-open refresh fails RED.
-    let active = { beatKey: 'dispel', eventIds: ['u-0002#1'] };
+    // NEW active beat's abstracted rows, never a cached prior reveal. Pin it so a future "render once"
+    // refactor that drops the per-open refresh fails RED.
+    let active: LegendGrounding = {
+      beatKey: 'dispel',
+      rows: [{ tool: 'Read', role: 'schema', outcome: 'success', concept: 'DISPEL-CONCEPT' }],
+    };
     overlay = createLegendOverlay({ parent, entries: SAMPLE_ENTRIES, getActiveGrounding: () => active });
 
     overlay.open();
-    expect(overlay.root.textContent ?? '').toContain('u-0002#1');
+    expect(overlay.root.textContent ?? '').toContain('DISPEL-CONCEPT');
     overlay.close();
 
-    // The cursor advanced to the shaman beat; the next open must reflect THAT beat's real events.
-    active = { beatKey: 'shaman', eventIds: ['u-0009#0', 'u-0010#0'] };
+    // The cursor advanced to the shaman beat; the next open must reflect THAT beat's abstracted rows.
+    active = {
+      beatKey: 'shaman',
+      rows: [{ tool: null, role: 'source', outcome: 'isError', concept: 'SHAMAN-CONCEPT' }],
+    };
     overlay.open();
     const text = overlay.root.textContent ?? '';
     expect(text).toContain('shaman');
-    expect(text).toContain('u-0009#0');
-    expect(text).toContain('u-0010#0');
-    expect(text).not.toContain('u-0002#1'); // the stale dispel reveal is gone
+    expect(text).toContain('SHAMAN-CONCEPT');
+    expect(text).toContain('isError');
+    expect(text).not.toContain('DISPEL-CONCEPT'); // the stale dispel reveal is gone
   });
 });
 

@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T15:00:00Z
+last_updated: 2026-06-15T16:30:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -650,4 +650,69 @@ development_status:
   5-3: backlog
   5-4: backlog
   # 5-5: payload-free bundle (abstracted grounding) — privacy refinement surfaced during the build
-  5-5: backlog
+  # 5-5 moved backlog -> ready-for-dev (create-story). BUILD-SURFACED privacy/teaching refinement of Story
+  # 5.2's bundle (NOT in epics.md; Given/When/Then ACs authored verbatim with the operator). HARD operator
+  # line: the PUBLIC bundle must NEVER ship a real file/symbol name or path — only a mechanically-derived
+  # COARSE ROLE. REPLACES the bundle's full normalizedEvents (today: payloads w/ raw content up to ~28KB/
+  # event + real file paths like /work/project/src/schema/normalized-event.ts — verified) with a minimal
+  # payload-free projectedEvents array keeping ONLY {orderKey+eventId (opaque), eventType, toolName,
+  # outcome(isError?'isError':'success'), abstracted role}. ADDS a PURE name-discarding classifyRole(path)
+  # (src/bundle/classify-role.ts; ordered first-match: test/schema/migration/config/doc/source; reads the
+  # path at BAKE time, emits ONLY the token, discards the path — NO LLM/semantic mapping) + projectEvents
+  # (src/bundle/project-events.ts). The assembler still freezes + hashes over the FULL scrubbed events
+  # (annotationHash UNCHANGED — provenance is over the INPUT; the bundle carries the HASH not the events),
+  # then ships ONLY the projection (full content + real names DROPPED). The portal grounding (4.4) is
+  # re-pointed to the ABSTRACTED projection (tool + role + outcome + teaching concept from teaching.json,
+  # NOT raw events/names); the verbatim 'sight-beyond-sight' deep-dive is a DEFERRED local-only mode (NOT
+  # built — keep the seam clean). The scrub (5.1) still runs on the projection (defense-in-depth). The
+  # change is mechanically inert at replay (the timeline is BAKED; no browser-reachable code reads
+  # event.payload/toolName — verified; the projection keeps the eventIds the freeze/timeline/portal refs
+  # resolve on). schemaVersion stays z.literal(1) (pre-ship v0.1; the only consumers are in-repo + updated
+  # here). Regenerates the committed public/bundles/story-10-1.json (payload-free) + rewrites
+  # committed-bundle.test.ts (byte-absence: grep-absent of raw content + paths/names + bounded per-event
+  # size). GATE-VERIFIABLE (~fully): classifier purity+no-echo (AC3); projection 5-key shape + no-leak
+  # .not.toContain (AC1); bundle byte-absence + bounded size (AC2); portal abstracted-grounding rows
+  # accurate on the fixture (dispel+shaman) + fail-loud-on-dangling + no name/content (AC4); bake reads
+  # full session but ships only the projection + scrub runs on it (AC5); R1/R4/R5; grep -ril anthropic
+  # dist/ = NOTHING; BOTH golden snapshots (pace/+ingest/) byte-stable (NO Layer-0 code); rebuild
+  # byte-identical. OPERATOR-VERIFIED (NOT a gate): on-screen abstracted-grounding legibility (pnpm dev).
+  # NOT final art (5.3) or deploy (5.4). NO git commit (operator commits between stories). epic-5 stays
+  # in-progress (5-5 is not the first Epic-5 story; no epic flip triggered).
+  # 5-5 moved ready-for-dev -> in-progress -> review (dev-story, baseline 13a5137). Implemented the
+  # payload-free bundle + abstracted grounding: pure name-discarding classifyRole (src/bundle/
+  # classify-role.ts) + pure payload-free projectEvents (src/bundle/project-events.ts); replaced the
+  # bundle's full normalizedEvents with a {orderKey,eventId,eventType,toolName,outcome,role}
+  # projectedEvents (.strict() ProjectedEventSchema; schemaVersion stays 1). The assembler projects AFTER
+  # freeze + ships the projection (annotationHash/freeze UNCHANGED over the full scrubbed events —
+  # provenance over the INPUT; F3 dangling-beat guard re-pointed to projectedEvents + a §5 referenced-ids
+  # fail-loud added). The portal grounds beats to abstracted {tool,role,outcome,concept} rows
+  # (resolveAbstractedGrounding; concept reused from teaching.json) — AnnotatedView/applyOverlay made
+  # GENERIC in E to minimize churn (§6 seam, documented); legend-overlay displays the abstracted rows (no
+  # eventId/file/symbol name shown). Regenerated public/bundles/story-10-1.json (payload-free, byte-stable;
+  # annotationHash + scrubHash IDENTICAL to the prior committed bundle — provenance unchanged). Made the 6
+  # ATDD red tests green honestly (2 fixed WITH documented justification, none weakened) + re-pointed the
+  # 1.2/5.2/4.4 bundle/portal/overlay/boot suites (incl. the legend/boot AC2 reveal now asserts the AC4
+  # abstracted grounding instead of raw eventIds). Gates GREEN: typecheck/lint clean (eslint.config.ts
+  # UNTOUCHED, R1/R4/R5 hold), 100 files / 1019 tests (was 93/937), build OK, grep -ril anthropic dist/
+  # empty, dist bundle payload-free, BOTH golden snapshots (pace/+ingest/) byte-stable (Layer-0 untouched),
+  # 3 rebuilds byte-identical (per-event <=203 bytes). Deferred 'sight-beyond-sight' deep-dive NOT built.
+  # NO git commit (the regenerated bundle is staged for the operator). epic-5 stays in-progress (5-3 art +
+  # 5-4 deploy remain — operator/external steps).
+  # 5-5 review -> done (senior-review fix round 1). Review APPROVED all 5 ACs; 3 low findings, all resolved.
+  # F1 (fix): the classify-role dotted-config-basename rule (tsconfig|eslint|vite|package)[^/]*$ over-matched
+  # SOURCE files merely STARTING with a prefix (PackageList.tsx/vite-plugin-custom.ts/eslint-runner.ts/
+  # packageResolver.ts -> 'config' not 'source' — a name-free but WRONG coarse role rendered to the viewer,
+  # AC4 accuracy; NOT a leak). Fixed at root cause: (^|/)(tsconfig|eslint|vite|jest)\.[^/]+$ (dot required) +
+  # (^|/)package\.json$ (exact); every legit config path still classifies 'config' via the .json/.config.*
+  # rules, so the committed bundle's roles are UNCHANGED. Added F1/ANCHORING regression cases. F2 (consider,
+  # applied): added .strict() to ReplayBundleSchema so a regression re-introducing a top-level normalizedEvents
+  # (old leak vector) fails LOUD at the parse boundary instead of being silently stripped (defense-in-depth,
+  # mirrors the per-event .strict(); verified the sole composition point + committed bundle carry exactly the
+  # 9 declared keys) + 2 reject tests. F3 (likely-refute): REFUTED, no code change — eventId is the documented
+  # §1 ref-stable opaque id (u-0001/u-0002#1; no name/path/content) every timeline/annotation ref + freeze
+  # guard + portal lookup keys on; 6-key set matches EXPECTED_KEYS. Gates re-run GREEN: typecheck/lint clean
+  # (eslint.config.ts UNTOUCHED, R1/R4/R5 hold), 100 files / 1024 tests (was 1019; +5 regression tests), build
+  # OK, grep -ril anthropic dist/ empty, dist bundle payload-free, BOTH golden snapshots byte-stable,
+  # public/bundles/story-10-1.json regenerated byte-IDENTICAL (annotationHash c10c15aa.., bundleHash a0ebc77c..
+  # unchanged). NO git commit. epic-5 stays in-progress (5-3 art + 5-4 deploy remain).
+  5-5: done

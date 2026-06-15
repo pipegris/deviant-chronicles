@@ -22,6 +22,7 @@ import type { RenderPort } from './render-port';
 //
 import { startArena } from './arena-boot';
 import type { PlaybackAction, PlaybackState } from '../model/playback';
+import { TEACHING } from '../portal/teaching-config';
 
 // NOTE (dev-story, GREEN): the ATDD scaffold copied the full committed-fixture ingest chain (runIngest /
 // readFixture / the timeline() helper + the ingest/pace/translate + node:fs imports) verbatim from
@@ -203,17 +204,15 @@ describe('Story 4.4 AC1 — the converse positive: playback keeps ADVANCING whil
   });
 });
 
-describe('Story 4.4 AC2 — opening the Legend REVEALS the active beat`s real Layer-0 event(s) (the reveal seam, fantasy -> real)', () => {
-  // TEST-REVIEW (Story 4.4 test-quality pass): AC2 is "the portal resolves the beat's groundingPointer to
-  // show the real Event(s)". The boot's `getActiveGrounding` accessor (cursor -> active grounded beat ->
-  // resolveGrounding -> real eventIds, fed to the overlay's grounding section) is the PRODUCTION reveal
-  // seam — yet it had NO test: portal.test.ts proves `resolveGrounding` in isolation and legend-overlay's
-  // own suite stubs the grounding, but nothing exercised the live cursor -> active-beat selection ->
-  // resolved real eventIds -> DOM panel through the REAL wiring. A regression in beatIndexOfAnchor, the
-  // `idx >= cursor` boundary, or the latest-wins pick would pass every prior gate. These pin it end-to-end
-  // on the committed fixture (dispel = beat 0 / grounds u-0002#1,u-0002#2,u-0003#0; shaman = beat 7 /
-  // grounds u-0009#0,u-0010#0 — the SAME real Layer-0 truth the FixtureInterpreter authored). The overlay
-  // mounts into #app, so we read its rendered grounding via the live DOM (jsdom). [story Task 4, AC2]
+describe('Story 4.4 / 5.5 AC4 — opening the Legend REVEALS the active beat`s ABSTRACTED grounding (the reveal seam)', () => {
+  // dev-story re-point (Story 5.5 / AC4): the boot's `getActiveGrounding` now resolves the ABSTRACTED
+  // grounding (tool + role + outcome + concept) via portal.resolveAbstractedGrounding — NOT raw eventIds.
+  // These pin it END-TO-END through the REAL wiring on the committed fixture (cursor -> active-beat
+  // selection -> resolveAbstractedGrounding over bundle.projectedEvents -> DOM panel): dispel grounds
+  // u-0002#1/#2/#3 (the #2 Read is a SCHEMA path -> { tool: 'Read', role: 'schema', outcome: 'success' });
+  // shaman grounds u-0009#0 (FAILED result -> outcome 'isError') + u-0010#0 (a Read). The AC4 requirement
+  // is that NO raw eventId / file / symbol name is SHOWN — so these assert the abstracted rows + the
+  // teaching concept (reused from teaching.json) and assert the eventIds are ABSENT. [story Task 4, AC4]
   function groundingText(): string {
     const el = document.querySelector<HTMLElement>('.legend-grounding');
     if (!el) throw new Error('the boot must mount the Legend overlay (with a grounding section) into #app');
@@ -221,7 +220,7 @@ describe('Story 4.4 AC2 — opening the Legend REVEALS the active beat`s real La
     return el.hidden ? '' : (el.textContent ?? '');
   }
 
-  it('after reaching the Dispel beat, opening the Legend shows the dispel`s real eventIds', () => {
+  it('after reaching the Dispel beat, the Legend shows the dispel`s ABSTRACTED grounding (no raw eventId)', () => {
     const adapter = new CountingRenderAdapter();
     booted = bootWithFake(adapter);
 
@@ -230,11 +229,14 @@ describe('Story 4.4 AC2 — opening the Legend REVEALS the active beat`s real La
 
     booted.legend.open();
     const text = groundingText();
-    // Accurate to the real Event (AC2): the dispel grounds the assumption text + the ground-truth Read pair.
+    // Accurate to the real Event at the ABSTRACTED level (AC4): the dispel grounds a Read on a SCHEMA path
+    // + the dispel teaching concept. The verbatim eventIds / paths / names are NOT shown.
     expect(text).toContain('dispel');
-    expect(text).toContain('u-0002#1');
-    expect(text).toContain('u-0002#2');
-    expect(text).toContain('u-0003#0');
+    expect(text).toContain('Read');
+    expect(text).toContain('schema');
+    expect(text).toContain(TEACHING.dispel);
+    expect(text).not.toContain('u-0002#1');
+    expect(text).not.toContain('u-0002#2');
   });
 
   it('before ANY grounded beat is reached (cursor=0, paused), the grounding section stays hidden (fail-closed)', () => {
@@ -248,7 +250,7 @@ describe('Story 4.4 AC2 — opening the Legend REVEALS the active beat`s real La
     expect(groundingText()).toBe('');
   });
 
-  it('once the Shaman beat is reached, the reveal switches to the LATEST grounded beat (shaman`s real events)', () => {
+  it('once the Shaman beat is reached, the reveal switches to the LATEST grounded beat (shaman`s abstracted grounding)', () => {
     const adapter = new CountingRenderAdapter();
     booted = bootWithFake(adapter);
 
@@ -260,10 +262,12 @@ describe('Story 4.4 AC2 — opening the Legend REVEALS the active beat`s real La
     booted.legend.open();
     const text = groundingText();
     expect(text).toContain('shaman');
-    expect(text).toContain('u-0009#0');
-    expect(text).toContain('u-0010#0');
-    // It is the shaman reveal now, not the stale dispel one (latest grounded beat wins).
-    expect(text).not.toContain('u-0002#1');
+    // The shaman grounds a FAILED result (outcome 'isError') + the shaman teaching concept.
+    expect(text).toContain('isError');
+    expect(text).toContain(TEACHING.shaman);
+    // It is the shaman reveal now, not the stale dispel one (latest grounded beat wins) — and no raw id.
+    expect(text).not.toContain(TEACHING.dispel);
+    expect(text).not.toContain('u-0009#0');
   });
 });
 

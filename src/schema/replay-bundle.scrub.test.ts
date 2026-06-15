@@ -25,18 +25,16 @@ import {
 
 const validOrderKey = { logicalClock: 0, streamId: 'main', seqWithinStream: 0 };
 
-const validNormalizedEvent = {
+// dev-story re-point (Story 5.5): the bundle ships `projectedEvents` (payload-free), not the full
+// `normalizedEvents`. Fixture updated to a valid ProjectedEvent; the Story 5.2 scrub-provenance
+// assertions below are unaffected in intent (they pin the additive nullable `scrub` block).
+const validProjectedEvent = {
   orderKey: validOrderKey,
   eventId: 'evt-0001',
   eventType: 'tool_use',
   toolName: 'Edit',
-  subtype: null,
-  timestamp: '2026-06-14T14:55:00.000Z',
-  streamDepth: 0,
-  exitCode: 0,
-  isError: false,
-  retryCount: 0,
-  payload: { filePath: 'src/main.ts' },
+  outcome: 'success',
+  role: 'source',
 };
 
 const validBeat = {
@@ -76,7 +74,7 @@ const validScrub = {
 // scrub: null (the additive-nullable backward-compatibility claim of Decision §1).
 const baseBundle = {
   schemaVersion: 1,
-  normalizedEvents: [validNormalizedEvent],
+  projectedEvents: [validProjectedEvent],
   annotations: [validAnnotation],
   battleTimeline: {
     schemaVersion: 1,

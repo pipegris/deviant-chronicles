@@ -22,12 +22,25 @@ export type LegendEntry = {
   real: string;
 };
 
-// A resolved active-beat grounding row to show in the optional "active beat -> real event(s)" section:
-// the beat plus the real Layer-0 eventIds it dramatizes (resolved by portal.resolveGrounding upstream;
-// the overlay only DISPLAYS them — it never resolves itself, keeping it pure-display + phaser-free).
+// One abstracted grounding row the overlay renders for the active beat (Story 5.5 / AC4): tool + coarse
+// role + per-event outcome + the teaching concept. Declared structurally here (decoupled from the
+// separately-gated portal AbstractedGrounding) so the overlay stays renderer-agnostic and renders exactly
+// the rows it is handed. NO file/symbol name can appear (the projection has none — structurally).
+export type LegendGroundingRow = {
+  tool: string | null;
+  role: string;
+  outcome: string;
+  concept: string;
+};
+
+// A resolved active-beat grounding to show in the optional "active beat -> abstracted grounding" section:
+// the beat plus the ABSTRACTED rows it dramatizes (resolved by portal.resolveAbstractedGrounding upstream;
+// the overlay only DISPLAYS them — it never resolves itself, keeping it pure-display + phaser-free). Story
+// 5.5 (AC4) replaces the prior bare-eventId list with the abstracted rows (tool/role/outcome/concept) — no
+// raw eventId is the VISIBLE grounding text now (the AC asks for the abstracted grounding). [Dev Notes §6]
 export type LegendGrounding = {
   beatKey: string;
-  eventIds: readonly string[];
+  rows: readonly LegendGroundingRow[];
 };
 
 export type LegendOverlayOptions = {
@@ -102,8 +115,14 @@ export function createLegendOverlay(opts: LegendOverlayOptions): LegendOverlay {
 
   function refreshGrounding(): void {
     const active = getActiveGrounding?.() ?? null;
-    if (active && active.eventIds.length > 0) {
-      grounding.textContent = `Active beat "${active.beatKey}" grounds: ${active.eventIds.join(', ')}`;
+    if (active && active.rows.length > 0) {
+      // Render each abstracted row as a human-readable "tool + role + outcome — concept" line. NO raw
+      // eventId / file / symbol name is shown (the AC4 requirement; the rows structurally carry none).
+      const lines = active.rows.map((r) => {
+        const tool = r.tool ?? '(no tool)';
+        return `${tool} · ${r.role} · ${r.outcome} — ${r.concept}`;
+      });
+      grounding.textContent = `Active beat "${active.beatKey}" grounds: ${lines.join(' | ')}`;
       grounding.hidden = false;
     } else {
       grounding.textContent = '';

@@ -1,4 +1,3 @@
-import type { NormalizedEvent } from '../schema/normalized-event';
 import type { BattleTimeline } from '../schema/battle-timeline';
 import { createPlaybackReducer, initialPlaybackState } from '../model/playback';
 import type { PlaybackAction, PlaybackState } from '../model/playback';
@@ -11,7 +10,7 @@ import type { LegendGrounding, LegendOverlay } from './legend-overlay';
 import { applyOverlay } from '../interpret/overlay';
 import type { AnnotatedView } from '../interpret/overlay';
 import type { BeatAnnotation } from '../schema/beat-annotation';
-import { getLegendEntries, resolveGrounding, LEGEND_BEATS } from '../portal/portal';
+import { getLegendEntries, resolveAbstractedGrounding, LEGEND_BEATS } from '../portal/portal';
 import { planBeatBehaviors } from './beat-behavior';
 import type { BeatSignal } from '../interpret/beat-signal';
 import { planCaptions, planCaptionCorrection } from '../scribe/captions';
@@ -19,7 +18,7 @@ import type { CaptionOp } from '../scribe/captions';
 import { planTeaching } from '../portal/teaching';
 import type { TeachingOp } from '../portal/teaching';
 import { readSaga } from '../scribe/saga';
-import { ReplayBundleSchema, type ReplayBundle } from '../schema/replay-bundle';
+import { ReplayBundleSchema, type ReplayBundle, type ProjectedEvent } from '../schema/replay-bundle';
 import defaultBundleJson from '../../public/bundles/story-10-1.json';
 
 // arena-boot — wires the Story 2.2 playback reducer to the RenderPort adapter AND the Story 2.5
@@ -142,7 +141,7 @@ export function bootFromBundle(
   return bootCore(
     {
       timeline: bundle.battleTimeline,
-      events: bundle.normalizedEvents,
+      events: bundle.projectedEvents,
       annotations: bundle.annotations,
       saga,
     },
@@ -166,7 +165,7 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
   return bootCore(
     {
       timeline: bundle.battleTimeline,
-      events: bundle.normalizedEvents,
+      events: bundle.projectedEvents,
       annotations: bundle.annotations,
       saga,
     },
@@ -183,7 +182,8 @@ export function startArena(parent = 'game-container', deps: BootDeps = {}): Aren
 function bootCore(
   source: {
     timeline: BattleTimeline;
-    events: readonly NormalizedEvent[];
+    // Story 5.5: the bundle now carries the payload-free projection; the overlay/grounding consume it.
+    events: readonly ProjectedEvent[];
     annotations: readonly BeatAnnotation[];
     saga: string | null;
   },
@@ -201,7 +201,10 @@ function bootCore(
   // baked the timeline from (R1: the overlay is read-only, never feeding mechanics). The overlay is
   // built SYNCHRONOUSLY so the fully-built `view` exists BEFORE the first tick — the headless boot test
   // drives advanceIfPlaying synchronously and needs the annotations on tick 1. [story Task 4; #R4]
-  const view: AnnotatedView = applyOverlay([...source.events], [...source.annotations]);
+  const view: AnnotatedView<ProjectedEvent> = applyOverlay(
+    [...source.events],
+    [...source.annotations],
+  );
 
   // The boot-owned signal sink (Story 3.3): a no-op if no consumer is wired. Story 4.1 (FR-9) now
   // wires it: an injected sink (if any) still RECEIVES every signal (the Story-3.3 contract is
@@ -407,9 +410,10 @@ function bootCore(
     speeds: [1, 2],
   });
 
-  // Story 4.4 — the active-beat GROUNDING accessor for the Legend overlay. PURE + READ-ONLY: it reads
-  // the live cursor + the frozen read-only `view` and resolves (via portal.resolveGrounding) the real
-  // Layer-0 event(s) the CURRENT active beat dramatizes (fantasy -> real, AC2). "Active beat" = the
+  // Story 4.4 / 5.5 — the active-beat GROUNDING accessor for the Legend overlay. PURE + READ-ONLY: it
+  // reads the live cursor + the frozen read-only `view` and resolves (via portal.resolveAbstractedGrounding)
+  // the ABSTRACTED grounding rows (tool + role + outcome + concept — Story 5.5/AC4, no raw event/name) the
+  // CURRENT active beat dramatizes. "Active beat" = the
   // grounded signature annotation the cursor has most-recently reached: for each LEGEND_BEATS type with
   // an annotation in the overlay, find the beat index whose sourceEventIds carries its anchor eventRef
   // (the same L1->L0 bridge the behaviors/teaching use), keep those at/before the cursor, and pick the
@@ -418,21 +422,23 @@ function bootCore(
   const beatIndexOfAnchor = (anchorEventRef: string): number =>
     timeline.beats.findIndex((b) => b.sourceEventIds.includes(anchorEventRef));
   const getActiveGrounding = (): LegendGrounding | null => {
-    let best: { beatKey: string; cursorIndex: number; eventIds: readonly string[] } | null = null;
+    let best: { beatKey: string; cursorIndex: number; rows: LegendGrounding['rows'] } | null = null;
     for (const beatType of LEGEND_BEATS) {
       const annotation = view.annotations.find((a) => a.beatType === beatType);
       if (!annotation) continue;
       const idx = beatIndexOfAnchor(annotation.eventRef);
       if (idx < 0 || idx >= state.cursor) continue; // not reached yet (cursor is the NEXT beat to play)
       if (!best || idx > best.cursorIndex) {
+        // Story 5.5 (AC4): surface the ABSTRACTED grounding rows (tool + role + outcome + concept), NOT
+        // bare eventIds — resolved from the payload-free projection the view carries. No name can leak.
         best = {
           beatKey: beatType,
           cursorIndex: idx,
-          eventIds: resolveGrounding(annotation, view).map((e) => e.eventId),
+          rows: resolveAbstractedGrounding(annotation, view),
         };
       }
     }
-    return best ? { beatKey: best.beatKey, eventIds: best.eventIds } : null;
+    return best ? { beatKey: best.beatKey, rows: best.rows } : null;
   };
 
   // Mount the Legend overlay ADDITIVELY alongside the controls (the createControls precedent), handing

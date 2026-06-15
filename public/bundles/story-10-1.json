@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "normalizedEvents": [
+  "projectedEvents": [
     {
       "orderKey": {
         "logicalClock": 0,
@@ -10,15 +10,8 @@
       "eventId": "u-0001",
       "eventType": "prompt",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "2026-06-14T15:56:48.752Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "text": "Kickoff: implement the ingest pipeline for Story 10.1."
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -29,15 +22,8 @@
       "eventId": "u-0002#1",
       "eventType": "text",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "2026-06-14T15:57:01.100Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "text": "I will start by reading the schema then editing the parser."
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -48,17 +34,8 @@
       "eventId": "u-0002#2",
       "eventType": "tool_use",
       "toolName": "Read",
-      "subtype": null,
-      "timestamp": "2026-06-14T15:57:01.100Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "input": {
-          "file_path": "/work/project/src/schema/normalized-event.ts"
-        }
-      }
+      "outcome": "success",
+      "role": "schema"
     },
     {
       "orderKey": {
@@ -69,15 +46,8 @@
       "eventId": "u-0003#0",
       "eventType": "tool_result",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "2026-06-14T15:57:03.500Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "content": "export const NormalizedEventSchema = ..."
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -88,18 +58,8 @@
       "eventId": "u-0004#0",
       "eventType": "tool_use",
       "toolName": "Write",
-      "subtype": null,
-      "timestamp": "2026-06-14T15:58:10.000Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "input": {
-          "file_path": "/work/project/src/ingest/parse-transcript.ts",
-          "content": "export function parseTranscript() {}"
-        }
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -110,15 +70,8 @@
       "eventId": "u-0005#0",
       "eventType": "tool_result",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "2026-06-14T15:58:11.200Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "content": "File created."
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -129,19 +82,8 @@
       "eventId": "u-0006#0",
       "eventType": "tool_use",
       "toolName": "Edit",
-      "subtype": null,
-      "timestamp": "2026-06-14T16:00:30.000Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "input": {
-          "file_path": "/work/project/src/ingest/parse-transcript.ts",
-          "old_string": "{}",
-          "new_string": "{ return []; }"
-        }
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -152,15 +94,8 @@
       "eventId": "u-0007#0",
       "eventType": "tool_result",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "2026-06-14T16:00:31.500Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "content": "Edit applied."
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -171,18 +106,8 @@
       "eventId": "u-0008#0",
       "eventType": "tool_use",
       "toolName": "Bash",
-      "subtype": null,
-      "timestamp": "2026-06-14T16:05:00.000Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "input": {
-          "command": "pnpm vitest run",
-          "description": "Run the test suite"
-        }
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -193,15 +118,8 @@
       "eventId": "u-0009#0",
       "eventType": "tool_result",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "2026-06-14T16:05:09.300Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": true,
-      "retryCount": 0,
-      "payload": {
-        "content": "FAIL src/ingest/parse-transcript.test.ts"
-      }
+      "outcome": "isError",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -212,17 +130,8 @@
       "eventId": "u-0010#0",
       "eventType": "tool_use",
       "toolName": "Read",
-      "subtype": null,
-      "timestamp": "2026-06-14T16:06:00.000Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "input": {
-          "file_path": "/work/project/src/ingest/normalize.ts"
-        }
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -233,26 +142,8 @@
       "eventId": "u-0011#0",
       "eventType": "tool_result",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "2026-06-14T16:06:01.500Z",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "content": [
-          {
-            "type": "text",
-            "text": "export function normalizeTranscript() {}"
-          },
-          {
-            "type": "tool_result",
-            "toolUseId": "t-read-2-nested",
-            "content": "nested raw payload",
-            "isError": false
-          }
-        ]
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -263,16 +154,8 @@
       "eventId": "phase-dev-OPAQUEHASH-1#started",
       "eventType": "journal_started",
       "toolName": null,
-      "subtype": null,
-      "timestamp": "",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "result": null,
-        "key": "phase-dev-OPAQUEHASH-1"
-      }
+      "outcome": "success",
+      "role": "source"
     },
     {
       "orderKey": {
@@ -283,19 +166,8 @@
       "eventId": "phase-dev-OPAQUEHASH-1#result",
       "eventType": "journal_result",
       "toolName": null,
-      "subtype": "complete",
-      "timestamp": "",
-      "streamDepth": 0,
-      "exitCode": null,
-      "isError": false,
-      "retryCount": 0,
-      "payload": {
-        "result": {
-          "status": "complete",
-          "verdict": "pass"
-        },
-        "key": "phase-dev-OPAQUEHASH-1"
-      }
+      "outcome": "success",
+      "role": "source"
     }
   ],
   "annotations": [

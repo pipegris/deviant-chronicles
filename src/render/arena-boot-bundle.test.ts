@@ -27,6 +27,7 @@ import { ReplayBundleSchema, type ReplayBundle } from '../schema/replay-bundle';
 // adapter, advances, and proves it renders from the BUNDLE (not from ?raw). No Phaser, no fetch in the
 // boot itself (the async fetch lives in main.ts + loadBundle); deterministic.
 import { startArena, loadBundle, bootFromBundle } from './arena-boot';
+import { projectEvents } from '../bundle/project-events';
 import type { PlaybackAction, PlaybackState } from '../model/playback';
 
 // ── A small but mechanically-real in-memory ReplayBundle ─────────────────────────────────────────────
@@ -58,7 +59,9 @@ const BAKED_SAGA = 'By hammer and hash, it is done!';
 function makeBundle(overrides: Partial<ReplayBundle> = {}): ReplayBundle {
   return ReplayBundleSchema.parse({
     schemaVersion: 1,
-    normalizedEvents: [EVENT_A, EVENT_B],
+    // dev-story re-point (Story 5.5): the bundle ships the PAYLOAD-FREE projection. Project the two
+    // synthetic full events so the boot folds the SAME eventIds (evt-a/evt-b the baked beats reference).
+    projectedEvents: projectEvents([EVENT_A, EVENT_B]),
     annotations: [
       {
         eventRef: 'evt-a',
@@ -185,7 +188,7 @@ describe('Story 5.2 / AC2 — loadBundle Zod-validates at the boundary (build-ti
 
     const loaded = await loadBundle('/bundles/story-10-1.json');
     expect(loaded.schemaVersion).toBe(1);
-    expect(loaded.normalizedEvents).toHaveLength(2);
+    expect(loaded.projectedEvents).toHaveLength(2);
     expect(loaded.saga).toBe(BAKED_SAGA);
     expect(fetchSpy).toHaveBeenCalledWith('/bundles/story-10-1.json');
   });

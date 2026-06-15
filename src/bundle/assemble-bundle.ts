@@ -5,6 +5,7 @@ import { ReplayBundleSchema, type ReplayBundle } from '../schema/replay-bundle';
 import { canonicalJSON, freezeAnnotations } from '../interpret/freeze';
 import { isPublishable, reportHash, type ScrubApproval } from '../scrub/gate';
 import type { ScrubResult } from '../scrub/scrub';
+import { projectEvents } from './project-events';
 
 // Story 5.2 / Task 2 — the PURE ReplayBundle assembler: the gate + freeze + compose + validate core
 // the thin scripts/build-bundle.ts orchestrator calls. It takes ALREADY-ingested + scrubbed inputs
@@ -33,15 +34,20 @@ export interface AssembleBundleInput {
 
 /**
  * Assemble a Zod-valid ReplayBundle from already-ingested + scrubbed inputs, running the Story 5.1
- * publish gate FIRST (fail-closed). The public `normalizedEvents` are the SCRUBBED events — never the
- * raw session — so the shipped artifact carries no un-redacted secrets.
+ * publish gate FIRST (fail-closed).
  *
- * Throws LOUD (with the gate `reasons`) when `isPublishable({ scrubResult, approval })` returns
- * `!ok` — the assembler REFUSES to build a publishable bundle from an unscrubbed/unreviewed session
- * (the gate wiring AC2/Story-5.1 mandate). The reasons carry no secret value (the gate's no-leak
- * invariant), so the thrown message is safe to print. Also throws when `freezeAnnotations` finds a
- * dangling grounding ref (a hallucinated eventRef), and when the composed value fails the schema at
- * the boundary (assemble-then-parse, fail loud on any drift). PURE — clock/RNG/network/fs-free.
+ * Story 5.5 (AC1/AC5): the bundle ships a PAYLOAD-FREE `projectedEvents` array (projectEvents over the
+ * scrubbed events), NOT the full `normalizedEvents`. The full scrubbed events are an INTERNAL bake input
+ * — they feed the annotationHash/freeze (provenance is over the INPUT, Decision §5), the F3 dangling-beat
+ * guard, and the referenced-id check — and are then DROPPED; they never reach the returned bundle. So the
+ * public artifact carries no raw payload, path, file name, or symbol name — only the abstracted projection.
+ *
+ * Throws LOUD (with the gate `reasons`) when `isPublishable({ scrubResult, approval })` returns `!ok` —
+ * the assembler REFUSES to build a publishable bundle from an unscrubbed/unreviewed session. The reasons
+ * carry no secret value (the gate's no-leak invariant). Also throws when `freezeAnnotations` finds a
+ * dangling grounding ref, when a timeline/annotation ref is absent from the SHIPPED projection (F3/§5),
+ * and when the composed value fails the schema at the boundary (assemble-then-parse). PURE — clock/RNG/
+ * network/fs-free.
  */
 export function assembleBundle(input: AssembleBundleInput): ReplayBundle {
   const { scrubResult, approval } = input;
@@ -57,30 +63,54 @@ export function assembleBundle(input: AssembleBundleInput): ReplayBundle {
     );
   }
 
-  // The PUBLIC events are the SCRUBBED ones (the whole point of the gate). The baked timeline the
-  // script computed is paced from these SAME events, so the bundle is internally consistent (§4).
-  const normalizedEvents = scrubResult.scrubbedEvents;
+  // The full SCRUBBED events: an INTERNAL bake input (hashing/freeze/the guards below), DROPPED after
+  // assembly — never placed in the returned bundle (§5). The baked timeline the script computed is paced
+  // from these SAME events, so the bundle is internally consistent (§4).
+  const scrubbedEvents = scrubResult.scrubbedEvents;
 
-  // Freeze the interpretation: re-validate, reject dangling grounding refs, content-address. The
-  // gate passing means `approval` is a non-null, matching marker here.
+  // Freeze the interpretation over the FULL scrubbed events: re-validate, reject dangling grounding refs,
+  // content-address. annotationHash stays over the INPUT (Decision §5) — UNCHANGED; the bundle carries the
+  // hash, not the events. The gate passing means `approval` is a non-null, matching marker here.
   const frozen = freezeAnnotations({
-    normalizedEvents,
+    normalizedEvents: scrubbedEvents,
     annotations: input.annotations,
     interpreterVersion: input.interpreterVersion,
     promptVersion: input.promptVersion,
   });
 
-  // review F3: enforce internal consistency at the SOLE composition point. The baked timeline's beat
-  // sourceEventIds are the Layer-0 grounding the portal resolves onto the SHIPPED normalizedEvents
-  // (Decision §4); mirror freezeAnnotations' dangling-ref guard so an alternate caller handing in a
-  // timeline NOT paced from the shipped events fails LOUD rather than composing a silently-inconsistent
-  // bundle (battleTimeline is otherwise only schema-shape-validated, never checked against the events).
-  const eventIds = new Set(normalizedEvents.map((e) => e.eventId));
+  // Story 5.5 (AC1/AC5): the SHIPPED per-event data is the payload-free projection of the scrubbed
+  // events. Computed AFTER freeze (freeze still saw the full events). The full events are discarded below.
+  const projectedEvents = projectEvents(scrubbedEvents);
+
+  // The SHIPPED identities — every guard now keys on what actually ships (§5). The projection preserves
+  // exactly the scrubbed events' eventIds (project-events keeps eventId), so these are the same ids freeze
+  // resolved against; re-pointing the guards here proves the SHIPPED bundle is self-consistent.
+  const shippedIds = new Set(projectedEvents.map((e) => e.eventId));
+
+  // review F3 (re-pointed to projectedEvents): the baked timeline's beat sourceEventIds are the Layer-0
+  // grounding the portal resolves onto the SHIPPED projection (Task 4); mirror freezeAnnotations'
+  // dangling-ref guard so an alternate caller handing in a timeline NOT paced from the shipped events
+  // fails LOUD rather than composing a silently-inconsistent bundle.
   for (const beat of input.battleTimeline.beats) {
     for (const ref of beat.sourceEventIds) {
-      if (!eventIds.has(ref)) {
+      if (!shippedIds.has(ref)) {
         throw new Error(
-          `assembleBundle: battleTimeline beat sourceEventId '${ref}' does not resolve to any normalizedEvents eventId (timeline not paced from the shipped events).`,
+          `assembleBundle: battleTimeline beat sourceEventId '${ref}' does not resolve to any projectedEvents eventId (timeline not paced from the shipped events).`,
+        );
+      }
+    }
+  }
+
+  // §5 defense-in-depth (mirror F3 for annotations): every eventId an annotation references — its anchor
+  // eventRef + all groundingPointer.eventRefs — must be present in the SHIPPED projection, so the portal's
+  // abstracted grounding (Task 4) cannot dangle at replay. freeze already proved these resolve against the
+  // full scrubbed events; this re-asserts they survived projection (no id dropped/renamed). Fail LOUD.
+  for (const annotation of frozen.annotations) {
+    const refs = [annotation.eventRef, ...annotation.groundingPointer.eventRefs];
+    for (const ref of refs) {
+      if (!shippedIds.has(ref)) {
+        throw new Error(
+          `assembleBundle: annotation grounding ref '${ref}' (beat '${annotation.beatType}') is absent from projectedEvents — the projection dropped an id the grounding references.`,
         );
       }
     }
@@ -91,7 +121,7 @@ export function assembleBundle(input: AssembleBundleInput): ReplayBundle {
   // embedded address matches what an auditor recomputes.
   const bundle = {
     schemaVersion: 1 as const,
-    normalizedEvents,
+    projectedEvents,
     annotations: [...frozen.annotations],
     battleTimeline: input.battleTimeline,
     tuningConfig: input.tuningConfig,

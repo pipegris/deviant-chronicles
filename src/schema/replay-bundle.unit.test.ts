@@ -7,18 +7,16 @@ import { z } from 'zod';
 import { ReplayBundleSchema, TuningConfigSchema } from './replay-bundle';
 
 const validOrderKey = { logicalClock: 0, streamId: 'main', seqWithinStream: 0 };
-const validNormalizedEvent = {
+// dev-story re-point (Story 5.5): the bundle ships `projectedEvents` (payload-free), not the full
+// `normalizedEvents`. Fixture updated to a valid ProjectedEvent; these unit assertions (baked-timeline
+// required, tuningConfig loose) are unaffected in intent.
+const validProjectedEvent = {
   orderKey: validOrderKey,
   eventId: 'evt-0001',
   eventType: 'tool_use',
   toolName: 'Edit',
-  subtype: null,
-  timestamp: '2026-06-14T14:55:00.000Z',
-  streamDepth: 0,
-  exitCode: 0,
-  isError: false,
-  retryCount: 0,
-  payload: { filePath: 'src/main.ts' },
+  outcome: 'success',
+  role: 'source',
 };
 const validBeat = {
   orderKey: validOrderKey,
@@ -37,7 +35,7 @@ const validAnnotation = {
 };
 const validBundle = {
   schemaVersion: 1,
-  normalizedEvents: [validNormalizedEvent],
+  projectedEvents: [validProjectedEvent],
   annotations: [validAnnotation],
   battleTimeline: { schemaVersion: 1, beats: [validBeat], totalDurationMs: 400 },
   tuningConfig: { someRule: 'value' },

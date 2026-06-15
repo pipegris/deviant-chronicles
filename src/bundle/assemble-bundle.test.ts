@@ -32,6 +32,7 @@ import {
 // LLM; (2) the Story 5.1 publish gate BLOCKS unscrubbed/unreviewed and PASSES scrubbed+approved
 // (fail-closed); (4) hash determinism — same inputs → identical annotationHash + bundleHash.
 import { assembleBundle, bundleHash } from './assemble-bundle';
+import { projectEvents } from './project-events';
 
 // ── Fixture inputs (the MOCKED-LLM path: scrubbed fixture events + a placeholder Saga) ───────────────
 // The scrub result over the committed planted-secrets fixture (the SAME shared input src/scrub
@@ -158,11 +159,21 @@ describe('Story 5.2 / AC1 — assembleBundle composes a Zod-valid ReplayBundle (
   });
 });
 
-describe('Story 5.2 / AC1 — the public normalizedEvents are the SCRUBBED events (never the raw session)', () => {
-  it('uses scrubResult.scrubbedEvents as normalizedEvents', () => {
+describe('Story 5.5 / AC1 — the public per-event data is the payload-free PROJECTION of the scrubbed events', () => {
+  // dev-story re-point (Story 5.5): the bundle no longer ships `normalizedEvents` (full payloads) — it
+  // ships `projectedEvents` (the payload-free projection). The Story 5.2 assertion `bundle.normalizedEvents
+  // === scrubbedEvents` is replaced by `bundle.projectedEvents === projectEvents(scrubbedEvents)`: the
+  // assembler projects the SAME scrubbed events the gate cleared, just payload-free. No assertion weakened
+  // — the "public events derive from the scrubbed session, never the raw one" guarantee is preserved and
+  // sharpened (the projection carries even less surface).
+  it('ships projectEvents(scrubResult.scrubbedEvents) as projectedEvents (no normalizedEvents key)', () => {
     const result = scrubResultOf();
-    const bundle = assembleBundle(assembleInput({ scrubResult: result }));
-    expect(bundle.normalizedEvents).toEqual(result.scrubbedEvents);
+    const bundle = assembleBundle(assembleInput({ scrubResult: result })) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(bundle.projectedEvents).toEqual(projectEvents(result.scrubbedEvents));
+    expect(Object.prototype.hasOwnProperty.call(bundle, 'normalizedEvents')).toBe(false);
   });
 
   it('contains NO planted secret value anywhere in the assembled bundle (the gate point, end-to-end)', () => {
