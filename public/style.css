@@ -10,6 +10,22 @@ body {
     height: 100vh;
     overflow: hidden;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 12px;
+}
+
+/* Story 2.5 playback controls — functional layout only (visual feel is operator-verified). A media-
+   player-style bar below the canvas: the play/pause/restart buttons, the scrub slider, the speed select. */
+.playback-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+}
+
+.playback-controls input[type="range"] {
+    flex: 1 1 320px;
+    min-width: 200px;
 }
