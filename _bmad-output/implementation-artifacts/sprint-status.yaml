@@ -505,3 +505,9 @@ development_status:
   # empty, both golden snapshots byte-stable. NO git commit. epic-4 stays in-progress (the operator flips
   # epic-4 -> done as the capstone, per the Epic-1/2/3 flip-post-senior-review precedent).
   4-4: done
+  # Epic 5 — Showcase Delivery (Scrub -> Bundle -> Public URL)
+  epic-5: in-progress
+  5-1: backlog
+  5-2: backlog
+  5-3: backlog
+  5-4: backlog
