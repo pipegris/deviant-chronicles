@@ -1,4 +1,13 @@
 import type { NormalizedEvent } from '../schema/normalized-event';
+import type { TaggingViewEvent } from '../bundle/tagging-view';
+
+// Story 5.6 (AC3, §8) — the Saga PROMPT input is either the FULL NormalizedEvent[] (legacy/default) or
+// the compact reduced TaggingViewEvent[] (the bake path). The Saga makes NO truth claim and only
+// JSON.stringify's its input into the prompt (no provenance/hash), so the input is OPAQUE — this union
+// just documents the two real shapes. `import type` keeps it erased at runtime (no scribe→bundle runtime
+// import / no cycle). The reduced view already carries the per-event arc the Saga needs (tool + role +
+// outcome + snippet, in order), so it is a sufficient authoring input (the AC's "it needs the arc, not bytes").
+type SagaInput = readonly NormalizedEvent[] | readonly TaggingViewEvent[];
 
 // Story 4.2 / AC1 — the OFFLINE Saga authoring logic (Layer 2, Told): calls claude-opus-4-8 for ONE
 // lush, Tolkien-register PROSE passage over the session's event window and returns it as a string.
@@ -86,7 +95,7 @@ export class SagaAuthor {
   // is free prose. Reads the first `text` content block and returns its trimmed text. A response with
   // no text block (a refusal / empty) THROWS — fail-loud at the authoring boundary, so a bad bake never
   // silently writes an empty Saga (the interpreter's missing-tool_use guard, applied to prose).
-  async authorSaga(events: NormalizedEvent[]): Promise<string> {
+  async authorSaga(events: SagaInput): Promise<string> {
     const client = await this.resolveClient();
 
     const response = await client.messages.create({

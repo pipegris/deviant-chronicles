@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T16:30:00Z
+last_updated: 2026-06-15T18:30:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -717,4 +717,52 @@ development_status:
   # unchanged). NO git commit. epic-5 stays in-progress (5-3 art + 5-4 deploy remain).
   5-5: done
   # 5-6: reduced tagging-view + multi-stream merge (enables the full-session real bake)
-  5-6: backlog
+  # 5-6 moved backlog -> ready-for-dev (create-story). BUILD-SURFACED enablement of the deferred
+  # full-session real bake (NOT in epics.md; ACs authored verbatim from the operator's createBrief). The
+  # ~689-event real Story 10.1 session (~294K tokens of full payloads) EXCEEDS the ~200K window for a
+  # one-shot `claude -p interpret`. Two pieces: (1) a PURE reduced "tagging view" (NEW src/bundle/
+  # tagging-view.ts) mapping the full NormalizedEvent[] -> a compact per-event {eventId, toolName, role
+  # (reuse 5.5 classifyRole), outcome (isError), bounded scrub-safe snippet <=~200 chars} for the
+  # interpreter/Saga PROMPT INPUT — PRESERVES eventId so groundings resolve, no payload, targets <250KB /
+  # <~60K tokens (AC1/AC4); (2) MULTI-STREAM ingest in scripts/build-bundle.ts — accept repeated
+  # --transcript/--stream-id pairs OR a --session-manifest JSON + --journal, parse+normalize EACH with its
+  # stream-id, then mergeStreams([...allTranscripts, journal]) (the EXISTING merge.ts already total-orders
+  # NormalizedEvent[][] — NO merge change); a SINGLE --transcript stays byte-identical (AC2). BAKE WIRING
+  # (AC3): the --cli/--real interpreter + Saga receive the REDUCED view (fits context) yet annotationHash +
+  # freeze stay over the FULL scrubbed events (provenance UNCHANGED) — resolved via an OPTIONAL
+  # interpret(promptEvents, groundingEvents=promptEvents) param so sourceHash hashes the FULL events while
+  # the prompt carries the view (the BeatInterpreter interface stays single-arg; the SDK import stays
+  # lazy/R4). The testable builders live under src/bundle/ (vitest include is src/**/*.test.ts — the
+  # thin-script precedent); scripts/build-bundle.ts stays thin glue. HARD INVARIANTS: the committed
+  # public/bundles/story-10-1.json stays BYTE-IDENTICAL (multi-stream is additive; single --transcript
+  # reproduces the prior devMaxEpoch+merge) + committed-bundle*.test.ts unweakened; the SHIPPED bundle
+  # stays the 5.5 payload-free projection (replay-bundle.ts UNTOUCHED); the reduced view is BAKE-INPUT ONLY
+  # (never shipped/hashed/the freeze input); snippets are scrub-safe (built on scrubResult.scrubbedEvents,
+  # path-FREE). This story builds + GATE-PROVES the machinery; the operator runs the real full-session bake
+  # afterward (NOT run here — no billed/real LLM, bundle not regenerated with rich content). FULLY
+  # gate-verifiable (no pixels): view purity/5-key shape/eventId-preserve/snippet-cap/role+outcome-match
+  # (AC1); multi-stream merge + single-transcript byte-identical (AC2); eventId-superset of refs +
+  # annotationHash over full events identical to HEAD (AC3); synthetic ~689-event size bound <250KB/<60K
+  # tokens (AC4); R1/R4/R5, grep -ril anthropic dist/ = NOTHING, BOTH golden snapshots byte-stable,
+  # determinism. NOT 5-3 art / 5-4 deploy (backlog deferred operator/external steps). NO git commit
+  # (operator commits between stories). epic-5 stays in-progress (5-6 is not the first Epic-5 story; no
+  # epic flip triggered).
+  # 5-6 review -> done (senior-review fix round 1, 2026-06-15). Review APPROVED all 8 ACs (shipped bundle +
+  # provenance + committed fixture byte-stable); 2 med + 4 low fix/consider + 2 low refute. Two latent code
+  # seams FIXED + regression-tested in src/bundle/tagging-view.ts: F1 (stripPaths gutted tag-salient Bash
+  # command path args like ./build.sh -> "" — path-stripping now restricted to the tool_result head + the
+  # file-op summary via a boundSnippet stripPath flag; the Bash command head, the beat signal §6, stays
+  # intact — a transient already-scrubbed bake input) + F2/F3 (snippets now cap on Buffer.byteLength UTF-8
+  # not UTF-16 units so the AC4 <250KB byte bound holds for multi-byte content — was ~335KB maxed; the
+  # "hard byte budget" comment corrected). F4/F5/F6 doc: File List + Modified entry now list
+  # transcript-source-plan.ts(+.test.ts) (the fail-closed CLI-shape planner moved out of the thin script so
+  # vitest covers the negative branches); gate count corrected 104/1067 -> 105/1089 (+1 omitted file +3 F1/
+  # F2/F3 regression tests); the AC3 "exercised end-to-end" note reworded to "gate-covered via the pure
+  # planTranscriptSources". F7 refuted (intentional documented fail-loud typo guard). F8 refuted (Math.max
+  # (...[]) -> -Infinity is verbatim PRE-EXISTING at HEAD build-bundle.ts:113-114, unreachable via the
+  # script — planTranscriptSources guarantees >=1 source). Gates GREEN: typecheck/lint clean (R1/R4/R5 hold,
+  # eslint.config.ts UNTOUCHED), 105 files / 1089 tests, build OK + grep -ril anthropic dist/ = NOTHING,
+  # public/bundles/story-10-1.json BYTE-IDENTICAL to HEAD (annotationHash c10c15aa unchanged), BOTH golden
+  # snapshots (pace/+ingest/) byte-stable. NO git commit. epic-5 stays in-progress (5-3 art + 5-4 deploy
+  # remain; 5-6 is not the Epic-5 capstone).
+  5-6: done

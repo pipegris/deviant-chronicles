@@ -16,7 +16,12 @@ import { classifyRole } from './classify-role';
 // translate internal would couple src/bundle/ → src/translate/ (Dev Notes §3 — translate.resolveTarget
 // is file-local and Layer-0; the lower-coupling choice is the two-line re-derivation). The path is read
 // ONLY to feed classifyRole and is then DISCARDED — it is never carried into the projection.
-function resolveTargetPath(event: NormalizedEvent): string | null {
+//
+// EXPORTED for Story 5.6 (Dev Notes §2): the reduced tagging-view builder (tagging-view.ts) derives
+// `role` from the SAME target path so the view and this shipped projection agree by construction — one
+// derivation, no drift. The returned string is a LOCAL value the caller feeds to classifyRole and then
+// discards; it is NEVER carried into the view (which stays path-free, AC1).
+export function resolveTargetPath(event: NormalizedEvent): string | null {
   const payload = event.payload;
   if (payload === null || typeof payload !== 'object') return null;
   const input = (payload as { input?: unknown }).input;

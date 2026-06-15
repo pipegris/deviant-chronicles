@@ -19,12 +19,25 @@
 //   jiti scripts/build-bundle.ts --real --transcript <real .sources path> --journal <...> \
 //     --stream-id <id> --out public/bundles/story-10-1.json --approval <real marker> \
 //     [--model <id>] [--interpreter-version <v>] [--prompt-version <v>]
+//
+// Story 5.6 — MULTI-STREAM ingest (AC2): the FULL session is dev + fix transcripts + the journal. Supply
+// EITHER repeated --transcript/--stream-id pairs OR a single --session-manifest JSON (a checked-in
+// [{transcript, streamId}, ...] table) — EXACTLY ONE of the two (fail-loud on both/neither). --journal
+// stays a single required flag (one journal per session). The legacy single --transcript/--stream-id pair
+// is unchanged (it maps to a one-element source list → byte-identical bundle).
+//   jiti scripts/build-bundle.ts --cli --session-manifest <session.json> --journal <...> \
+//     --out public/bundles/story-10-1.json --approval <marker> [--model <id>] [...versions]
+//
+// Story 5.6 — BAKE over the REDUCED view (AC3): on --cli/--real the interpreter + Saga receive the
+// compact buildTaggingView(scrubbedEvents) (so the ~689-event session fits the context window), yet the
+// interpreter's sourceHash + assembleBundle's annotationHash/freeze stay over the FULL scrubbed events
+// (provenance UNCHANGED). The DEFAULT mocked path never builds the view.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseTranscript } from '../src/ingest/parse-transcript';
-import { parseJournal } from '../src/ingest/parse-journal';
-import { normalizeTranscript, normalizeJournal } from '../src/ingest/normalize';
-import { mergeStreams } from '../src/ingest/merge';
+import { ingestSession } from '../src/bundle/session-ingest';
+import { SessionManifestSchema } from '../src/bundle/session-manifest';
+import { planTranscriptSources, manifestToPlannedSources } from '../src/bundle/transcript-source-plan';
+import { buildTaggingView } from '../src/bundle/tagging-view';
 import { scrubSession } from '../src/scrub/scrub';
 import {
   COMPILED_SCRUB_PATTERNS,
@@ -92,10 +105,23 @@ function requireFlag(argv: string[], name: string): string {
   return value;
 }
 
+// Resolve the transcript source list (raw text + stream-id per stream). The fail-CLOSED decision (EXACTLY
+// ONE of {--session-manifest, repeated --transcript/--stream-id pairs}; fail-loud on both/neither or a
+// count mismatch) is the gate-tested planTranscriptSources (src/bundle/transcript-source-plan.ts §4). The
+// SCRIPT owns only the fs reads here; planTranscriptSources owns the validation (so the negative branches
+// are covered by vitest, which never runs this file). A single --transcript + --stream-id (in any order
+// relative to --journal) reproduces the pre-5.6 single-stream ingest — byte-identical bundle.
+function resolveTranscriptSources(argv: string[]): Array<{ raw: string; streamId: string }> {
+  const plan = planTranscriptSources(argv);
+  const planned =
+    plan.kind === 'manifest'
+      ? manifestToPlannedSources(SessionManifestSchema.parse(JSON.parse(readFileSync(plan.manifestPath, 'utf8'))))
+      : plan.sources;
+  return planned.map(({ path, streamId }) => ({ raw: readFileSync(path, 'utf8'), streamId }));
+}
+
 async function main(argv: string[]): Promise<void> {
-  const transcriptPath = requireFlag(argv, 'transcript');
   const journalPath = requireFlag(argv, 'journal');
-  const streamId = requireFlag(argv, 'stream-id');
   const outPath = requireFlag(argv, 'out');
   const approvalPath = getFlag(argv, 'approval');
   const patternsPath = getFlag(argv, 'patterns');
@@ -105,16 +131,13 @@ async function main(argv: string[]): Promise<void> {
   const interpreterVersionFlag = getFlag(argv, 'interpreter-version');
   const promptVersionFlag = getFlag(argv, 'prompt-version');
 
-  // ── ingest (R3: ingest is the ONLY raw-JSONL parser) — the SAME path as scrub/interpret/scribe-saga.
-  const transcript = normalizeTranscript(
-    parseTranscript(readFileSync(transcriptPath, 'utf8'), streamId),
-    streamId,
-  );
-  const devMaxEpoch = Math.max(
-    ...transcript.map((e) => Date.parse(e.timestamp)).filter((n) => !Number.isNaN(n)),
-  );
-  const journal = normalizeJournal(parseJournal(readFileSync(journalPath, 'utf8')), devMaxEpoch + 1);
-  const events = mergeStreams([transcript, journal]);
+  // ── ingest (R3: ingest is the ONLY raw-JSONL parser, called inside ingestSession per stream). The
+  // script owns the fs reads; ingestSession parses+normalizes EACH transcript with its stream-id and
+  // merges [...allTranscripts, journal] into one orderKey-total-ordered session (Story 5.6 AC2). A single
+  // --transcript/--stream-id pair reproduces the pre-5.6 merge byte-for-byte (the byte-identical-bundle
+  // guarantee). The SAME merged events feed scrub/interpret/scribe-saga as before.
+  const transcripts = resolveTranscriptSources(argv);
+  const events = ingestSession({ transcripts, journalRaw: readFileSync(journalPath, 'utf8') });
 
   // ── scrub: redact the ingested events (Story 5.1). An optional override deny set, validated +
   // compiled fail-closed; defaults to the committed COMPILED_SCRUB_PATTERNS.
@@ -140,9 +163,17 @@ async function main(argv: string[]): Promise<void> {
   let promptVersion: string;
 
   if (cli || real) {
-    // Real interpret + saga over the scrubbed events. Lazily imported so neither @anthropic-ai/sdk
-    // nor node:child_process is ever on the default dev/CI path (R4). --cli injects the key-free
-    // `claude -p` adapter; --real falls back to ClaudeInterpreter/SagaAuthor's lazy SDK client.
+    // Real interpret + saga. Lazily imported so neither @anthropic-ai/sdk nor node:child_process is ever
+    // on the default dev/CI path (R4). --cli injects the key-free `claude -p` adapter; --real falls back
+    // to ClaudeInterpreter/SagaAuthor's lazy SDK client.
+    //
+    // Story 5.6 (AC3, §8): the interpreter + Saga PROMPT is the REDUCED tagging view — buildTaggingView
+    // over the SCRUBBED events — so the ~689-event session fits the context window. The interpreter ALSO
+    // receives the FULL scrubbed events as its grounding arg, so its per-annotation sourceHash stays over
+    // the full events (provenance unchanged). The Saga only serializes its input + makes no truth claim,
+    // so it takes the reduced view directly (it needs the per-event arc, not the bytes). annotationHash +
+    // freeze run inside assembleBundle over scrubResult (the FULL events), UNCHANGED — see the assemble step.
+    const taggingView = buildTaggingView(scrubResult.scrubbedEvents);
     const { ClaudeInterpreter } = await import('../src/interpret/claude-interpreter');
     const { SagaAuthor } = await import('../src/scribe/saga-author');
     let client: import('../src/llm/claude-cli-client').AnthropicLike | undefined;
@@ -166,8 +197,9 @@ async function main(argv: string[]): Promise<void> {
       promptVersion: promptVersionFlag,
     });
     const author = new SagaAuthor({ client, model, promptVersion: promptVersionFlag });
-    annotations = await interpreter.interpret(scrubResult.scrubbedEvents);
-    saga = await author.authorSaga(scrubResult.scrubbedEvents);
+    // Prompt = the reduced view; grounding = the FULL scrubbed events (so sourceHash stays over them).
+    annotations = await interpreter.interpret(taggingView, scrubResult.scrubbedEvents);
+    saga = await author.authorSaga(taggingView);
     interpreterVersion = interpreter.interpreterVersion;
     promptVersion = interpreter.promptVersion;
   } else {

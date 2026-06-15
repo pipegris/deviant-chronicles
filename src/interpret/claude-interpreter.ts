@@ -1,8 +1,17 @@
 import { createHash } from 'node:crypto';
 import type { NormalizedEvent } from '../schema/normalized-event';
+import type { TaggingViewEvent } from '../bundle/tagging-view';
 import { BeatAnnotationSchema, type BeatAnnotation } from '../schema/beat-annotation';
 import type { BeatInterpreter } from './beat-interpreter';
 import { canonicalJSON } from './freeze';
+
+// Story 5.6 (AC3, §8) — the interpreter PROMPT input is either the FULL NormalizedEvent[] (the legacy /
+// default path) or the compact reduced TaggingViewEvent[] (the bake path, so a large session fits the
+// context window). The prompt is OPAQUE to the interpreter — it is only JSON.stringify'd into the request
+// — so this union just documents the two real shapes; the structural grounding contract lives entirely on
+// the SEPARATE `groundingEvents: NormalizedEvent[]` arg. `import type` keeps this erased at runtime (no
+// interpret→bundle runtime import / no cycle; the only file-level edge stays bundle→interpret via freeze).
+type PromptEvents = readonly NormalizedEvent[] | readonly TaggingViewEvent[];
 
 // Story 3.2 / AC1 — the REAL BeatInterpreter: calls claude-sonnet-4-6 via FORCED tool output
 // and Zod-validates the result into BeatAnnotation[]. This is the ONLY production module that
@@ -104,14 +113,24 @@ export class ClaudeInterpreter implements BeatInterpreter {
     this.promptVersion = options.promptVersion ?? DEFAULT_PROMPT_VERSION;
   }
 
-  async interpret(events: NormalizedEvent[]): Promise<BeatAnnotation[]> {
+  // Story 5.6 / Task 4 (AC3, §8): `groundingEvents` is an OPTIONAL second arg defaulting to
+  // `promptEvents` — so a single-arg call is unchanged (grounds over the array it prompts with) and the
+  // BeatInterpreter interface stays single-arg (this is a ClaudeInterpreter-private extension). At bake
+  // time the script passes the REDUCED tagging view as `promptEvents` (so the large session fits the
+  // context window) and the FULL scrubbed events as `groundingEvents`, so the prompt shrinks while
+  // sourceHash + provenance stay computed over the full events (provenance unchanged). The forced-tool /
+  // validation logic is identical.
+  async interpret(
+    promptEvents: PromptEvents,
+    groundingEvents: NormalizedEvent[] = promptEvents as NormalizedEvent[],
+  ): Promise<BeatAnnotation[]> {
     const client = await this.resolveClient();
 
     const response = await client.messages.create({
       model: this.model,
       max_tokens: MAX_TOKENS,
       system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: JSON.stringify(events) }],
+      messages: [{ role: 'user', content: JSON.stringify(promptEvents) }],
       tools: [EMIT_BEATS_TOOL],
       tool_choice: { type: 'tool', name: EMIT_TOOL_NAME },
     });
@@ -140,7 +159,7 @@ export class ClaudeInterpreter implements BeatInterpreter {
     // deterministically over the grounded events) — so the frozen annotation's content address is
     // interpreter-stamped, not LLM-forgeable, and stays consistent with annotationHash. Zod still
     // validates the model's eventRef/beatType/confidence/groundingPointer (fail-loud preserved).
-    return rawAnnotations.map((a) => this.stampProvenance(a, events));
+    return rawAnnotations.map((a) => this.stampProvenance(a, groundingEvents));
   }
 
   // Overwrite the two provenance fields with interpreter-authoritative values, then parse. The
