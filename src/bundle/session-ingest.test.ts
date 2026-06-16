@@ -180,29 +180,33 @@ describe('Story 5.6 AC2 — ingestSession is deterministic', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
-// AC2 / AC3 (Hard Invariant 1 + 2) — the committed bundle's content address is UNCHANGED. The multi-
-// stream + reduced-view work is purely additive: the single-transcript path that produces the committed
-// fixture bundle must keep emitting the SAME annotationHash. This guards the byte-identical bundle from
-// a refactor regression. (This is a companion guard in this RED file; it pins the value the dev must
-// preserve while wiring ingestSession into build-bundle.ts.)
+// AC2 / AC3 (Hard Invariant 1 + 2) — the FIXTURE bundle's content address is UNCHANGED. The multi-
+// stream + reduced-view work is purely additive: the single-transcript path that produces the FIXTURE
+// bundle must keep emitting the SAME annotationHash. This guards the byte-identical fixture build from
+// a refactor regression.
+//
+// Story 5.9 re-point: this guard moved from the SHIPPED public/bundles/story-10-1.json to the dedicated
+// FIXTURE bundle (src/render/__fixtures__/fixture-bundle.json). Since the Story 5.7/5.8 publish, the
+// shipped artifact is the FROZEN REAL-session bundle (a DIFFERENT annotationHash, frozen-once); the
+// FIXTURE bundle is the stable reference the mocked `pnpm bundle:story-10-1` reproduces, so it is what
+// must keep the c10c15aa content address.
 // ---------------------------------------------------------------------------------------------------
 
-const COMMITTED_BUNDLE = join(
+const FIXTURE_BUNDLE = join(
   dirname(fileURLToPath(import.meta.url)),
   '..',
-  '..',
-  'public',
-  'bundles',
-  'story-10-1.json',
+  'render',
+  '__fixtures__',
+  'fixture-bundle.json',
 );
 
-// The annotationHash committed at the Story 5.5 HEAD (public/bundles/story-10-1.json). Story 5.6 is
-// bake-INPUT only; it must NOT move this content address (AC3, Hard Invariant 2).
-const HEAD_ANNOTATION_HASH = 'c10c15aa86e16bee87ffb548f47b457dda84b441ad01d19911a480369496442f';
+// The annotationHash of the mocked fixture build (Story 5.5 HEAD value). The multi-stream/reduced-view
+// work is bake-INPUT only; it must NOT move this content address (AC3, Hard Invariant 2).
+const FIXTURE_ANNOTATION_HASH = 'c10c15aa86e16bee87ffb548f47b457dda84b441ad01d19911a480369496442f';
 
-describe('Story 5.6 AC3 — the committed bundle annotationHash is unchanged from HEAD', () => {
-  it('public/bundles/story-10-1.json still carries the HEAD annotationHash', () => {
-    const bundle = JSON.parse(readFileSync(COMMITTED_BUNDLE, 'utf8')) as { annotationHash?: string };
-    expect(bundle.annotationHash).toBe(HEAD_ANNOTATION_HASH);
+describe('Story 5.6 AC3 — the fixture bundle annotationHash is unchanged from HEAD', () => {
+  it('the fixture bundle still carries the HEAD annotationHash (the mocked-build content address)', () => {
+    const bundle = JSON.parse(readFileSync(FIXTURE_BUNDLE, 'utf8')) as { annotationHash?: string };
+    expect(bundle.annotationHash).toBe(FIXTURE_ANNOTATION_HASH);
   });
 });

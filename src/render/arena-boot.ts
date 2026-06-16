@@ -19,7 +19,7 @@ import { planTeaching } from '../portal/teaching';
 import type { TeachingOp } from '../portal/teaching';
 import { readSaga } from '../scribe/saga';
 import { ReplayBundleSchema, type ReplayBundle, type ProjectedEvent } from '../schema/replay-bundle';
-import defaultBundleJson from '../../public/bundles/story-10-1.json';
+import defaultBundleJson from './__fixtures__/fixture-bundle.json';
 
 // arena-boot — wires the Story 2.2 playback reducer to the RenderPort adapter AND the Story 2.5
 // on-screen CONTROLS. The boot OWNS the reducer state + adapter + controls (one-way: controls
@@ -36,15 +36,18 @@ import defaultBundleJson from '../../public/bundles/story-10-1.json';
 // main.ts fetch+Zod-validates the committed public/bundles/story-10-1.json via loadBundle then calls
 // bootFromBundle; the boot itself touches NO Layer-0 ingest path and NO LLM/SDK (the bundle is the
 // single source). startArena stays the drivable handle the heavily-tested boot suites use — it boots
-// from the committed bundle (statically imported + Zod-validated lazily) so its drivable contract is
-// unchanged, while staying tree-shakeable from prod (main.ts never calls it). [story Task 4; AC2]
+// from a DEDICATED TEST FIXTURE bundle (statically imported + Zod-validated lazily) so its drivable
+// contract is unchanged, while staying tree-shakeable from prod (main.ts never calls it). [story Task 4; AC2]
 
-// The committed fixture-derived bundle the legacy drivable handle (startArena) boots from. Parsed
-// LAZILY on the first startArena call (memoized), NOT at module load: main.ts imports this module for
-// loadBundle/bootFromBundle but NEVER calls startArena, so a lazy default keeps the static JSON import
-// + its parse referenced ONLY inside startArena — both then tree-shake out of the production bundle
-// (which fetches the bundle at runtime via loadBundle instead of inlining it). Validated fail-closed (a
-// malformed committed artifact throws on the first startArena call, not at first tick).
+// Story 5.9 — the startArena default is a DEDICATED committed TEST FIXTURE bundle
+// (src/render/__fixtures__/fixture-bundle.json), DECOUPLED from the SHIPPED public/bundles/story-10-1.json.
+// The shipped artifact is the FROZEN REAL-session bundle (the Story 5.7/5.8 bake), whose 47 real beats key
+// off different eventIds than the ingest fixtures the boot suites build their timelines from — so importing
+// it here would break the ~8 startArena boot suites (teaching/caption/legend/signal assertions pin the
+// fixture's two beats). The fixture bundle keeps startArena's content stable for those suites; production
+// fetches the real bundle at runtime via loadBundle (this static import + parse still tree-shake out of
+// prod, referenced ONLY inside startArena). Parsed LAZILY on the first startArena call (memoized), NOT at
+// module load — fail-closed (a malformed fixture throws on the first startArena call, not at first tick).
 let defaultBundleCache: ReplayBundle | undefined;
 function defaultBundle(): ReplayBundle {
   defaultBundleCache ??= ReplayBundleSchema.parse(defaultBundleJson as unknown);

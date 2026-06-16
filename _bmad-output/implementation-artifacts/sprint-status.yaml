@@ -874,3 +874,17 @@ development_status:
   # BYTE-IDENTICAL (annotationHash c10c15aa...), both golden snapshots byte-stable, AC5 files untouched. NO git
   # commit (operator commits). epic-5 stays in-progress (5-8 is not the Epic-5 capstone; 5-3 art + 5-4 deploy remain).
   5-8: done
+  # 5-9: publish-enabler — decouple the boot's static default bundle from the SHIPPED artifact (direct
+  # operator change, NOT a pipeline story; verified by full gates). The Story 5.7/5.8 real bake is clean
+  # (667 payload-free events, 47 beats, name-safe Saga) but publishing it as public/bundles/story-10-1.json
+  # broke ~8 startArena boot suites: arena-boot.ts statically imported the SHIPPED bundle as startArena's
+  # default, and those suites assert the FIXTURE's two beats (dispel@u-0002#1 + shaman@u-0010#0) which the
+  # real 47 UUID-keyed beats don't match. FIX: arena-boot.ts now imports a DEDICATED committed fixture
+  # bundle (src/render/__fixtures__/fixture-bundle.json = the prior fixture content) as startArena's default;
+  # production (main.ts -> loadBundle fetch) is unaffected (the static import tree-shakes from prod). Rescoped
+  # the session-ingest annotationHash guard to the fixture bundle (c10c15aa) and made committed-bundle.test.ts
+  # content-agnostic + added a STRUCTURAL Saga name-safety regression guard (no path/ext/snake_case — no real
+  # identifier hard-coded). Gates GREEN on the decouple (public/ still fixture): 109 files / 1149 tests, R4
+  # clean. The PUBLISH (swap public/bundles/story-10-1.json -> the real frozen bundle) is the next commit.
+  # epic-5 stays in-progress.
+  5-9: done

@@ -5,12 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { ReplayBundleSchema } from '../schema/replay-bundle';
 import { bundleHash } from './assemble-bundle';
 
-// Story 5.2 / Task 5+6 — a guard test over the COMMITTED fixture-derived artifact
-// public/bundles/story-10-1.json (the bundle that lets `pnpm dev`/`pnpm build` run end-to-end NOW).
-// It must stay ReplayBundleSchema-valid and carry the baked timeline + scrub provenance + a (placeholder)
-// Saga the committed dev build produces. A regression in the build script / schema / committed file is
-// caught here. Reading the committed file in a node test is fine (tests are not Layer-0). The operator's
-// --real bake regenerates this file with rich content (no code change) — this guard still holds then.
+// Story 5.2 / Task 5+6 (rescoped at Story 5.9) — a guard test over the COMMITTED
+// public/bundles/story-10-1.json. Since the Story 5.7/5.8 publish this is the FROZEN REAL-session bundle
+// (chunked `claude -p` interpret + the name-safe Saga); before publish it is the fixture build. This guard
+// is CONTENT-AGNOSTIC — it pins what must hold for EITHER: ReplayBundleSchema-valid, baked timeline +
+// payload-free projection + frozen annotations + a present Saga, scrub provenance that binds, computable
+// hashes, and (Story 5.8) a structurally name-safe Saga. The boot suites' fixture content lives separately
+// in src/render/__fixtures__/fixture-bundle.json (Story 5.9), so this guard pins no fixture-specific value.
+// Reading the committed file in a node test is fine (tests are not Layer-0).
 
 function committedBundleRaw(): unknown {
   // The committed artifact lives at <repo>/public/bundles/story-10-1.json; this file is src/bundle/.
@@ -30,7 +32,7 @@ describe('Story 5.2 — the committed public/bundles/story-10-1.json is a valid 
     expect(() => ReplayBundleSchema.parse(committedBundleRaw())).not.toThrow();
   });
 
-  it('carries the baked timeline, the payload-free projected events, frozen annotations, and a (placeholder) Saga', () => {
+  it('carries the baked timeline, the payload-free projected events, frozen annotations, and a Saga', () => {
     const bundle = ReplayBundleSchema.parse(committedBundleRaw());
     expect(bundle.schemaVersion).toBe(1);
     expect(bundle.battleTimeline.beats.length).toBeGreaterThan(0);
@@ -39,7 +41,8 @@ describe('Story 5.2 — the committed public/bundles/story-10-1.json is a valid 
     // committed-bundle.payload-free.test.ts (AC1/AC2); here we pin the composition + provenance + hashes.
     expect(bundle.projectedEvents.length).toBeGreaterThan(0);
     expect(bundle.annotations.length).toBeGreaterThan(0);
-    // The committed dev bundle carries the placeholder Saga (the deferred real bake replaces it).
+    // The committed bundle carries a Saga (the fixture placeholder before publish; the real name-safe
+    // Saga after the Story 5.8 bake is published) — assert only that it is present (content-agnostic).
     expect(bundle.saga).not.toBeNull();
   });
 
@@ -62,5 +65,26 @@ describe('Story 5.2 — the committed public/bundles/story-10-1.json is a valid 
     const bundle = ReplayBundleSchema.parse(committedBundleRaw());
     expect(bundle.annotationHash).toMatch(/^[0-9a-f]{64}$/);
     expect(bundleHash(bundle)).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('Story 5.8/5.9 — the committed bundle is structurally name-safe (Saga-leak regression guard)', () => {
+  // The Story 5.7 real bake's Saga leaked real identifiers because SagaAuthor was fed the snippet-bearing
+  // tagging-view; Story 5.8 authors it over the name-free public surface. This guards that regression
+  // STRUCTURALLY — by the SHAPE of a leak (path separators / source-file extensions / snake_case
+  // table-or-symbol tokens), NOT by hard-coding any real identifier (which would itself leak it into this
+  // public repo). Content-agnostic: passes on the fixture placeholder Saga AND the real name-safe Saga.
+  it('the committed Saga carries no path separators, source-file extensions, or snake_case identifiers', () => {
+    const bundle = ReplayBundleSchema.parse(committedBundleRaw());
+    const saga = bundle.saga ?? '';
+    expect(saga).not.toMatch(/[/\\]/); // a path separator is a leaked path
+    expect(saga).not.toMatch(/\.(ts|tsx|js|jsx|mjs|json|sql|env)\b/i); // a file extension is a leaked file
+    expect(saga).not.toMatch(/\b[a-z]+_[a-z_]+\b/); // snake_case = a leaked table/column/env-var/symbol
+  });
+
+  it('the serialized bundle carries no per-event payload or content (the shipped surface stays projected)', () => {
+    const serialized = JSON.stringify(committedBundleRaw());
+    expect(serialized).not.toContain('"payload"');
+    expect(serialized).not.toContain('"content"');
   });
 });
