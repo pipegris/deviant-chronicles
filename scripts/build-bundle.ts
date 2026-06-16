@@ -32,6 +32,12 @@
 // compact buildTaggingView(scrubbedEvents) (so the ~689-event session fits the context window), yet the
 // interpreter's sourceHash + assembleBundle's annotationHash/freeze stay over the FULL scrubbed events
 // (provenance UNCHANGED). The DEFAULT mocked path never builds the view.
+//
+// Story 5.7 — CHUNKED interpret (AC1, AC2): on --cli/--real the interpret is now WINDOWED into bounded
+// chunks (each well under the 600s `claude -p` timeout the whole ~689-event view exceeded one-shot), merged
+// + deduped via interpretChunked — yet each chunk call grounds over the FULL scrubbed events, so
+// annotationHash/freeze/provenance stay over the full events (UNCHANGED). The Saga stays ONE-SHOT (it is
+// not the bottleneck). The DEFAULT mocked path never builds the view nor chunks.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ingestSession } from '../src/bundle/session-ingest';
@@ -52,6 +58,10 @@ import { PACING_WEIGHTS, WINDOW_CONFIG } from '../src/pace/pacing-config';
 import { RULES } from '../src/translate/translation-rules';
 import { MODEL_TUNING } from '../src/model/model-tuning';
 import { fixtureAnnotations } from '../src/interpret/fixture-interpreter';
+// Story 5.7 — the PURE chunked interpret orchestrator. SDK-FREE (it injects the interpret callback), so this
+// STATIC import never pulls @anthropic-ai/sdk onto the default dev/CI path; only the LAZY
+// `await import('../src/interpret/claude-interpreter')` below does, inside the --cli/--real branch.
+import { interpretChunked } from '../src/interpret/chunked-interpret';
 import type { BeatAnnotation } from '../src/schema/beat-annotation';
 import { assembleBundle, bundleHash } from '../src/bundle/assemble-bundle';
 
@@ -197,8 +207,15 @@ async function main(argv: string[]): Promise<void> {
       promptVersion: promptVersionFlag,
     });
     const author = new SagaAuthor({ client, model, promptVersion: promptVersionFlag });
-    // Prompt = the reduced view; grounding = the FULL scrubbed events (so sourceHash stays over them).
-    annotations = await interpreter.interpret(taggingView, scrubResult.scrubbedEvents);
+    // Story 5.7: CHUNK the interpret so each `claude -p` call fits under the 600s timeout the whole
+    // ~689-event view exceeded one-shot. Prompt = each chunk of the reduced view; grounding = the FULL
+    // scrubbed events on EVERY call (so sourceHash stays over them); per-chunk results merged + deduped.
+    annotations = await interpretChunked({
+      promptView: taggingView,
+      groundingEvents: scrubResult.scrubbedEvents,
+      interpret: (chunk, grounding) => interpreter.interpret(chunk, grounding),
+    });
+    // The Saga stays ONE-SHOT over the reduced view — it makes a single text completion, not the bottleneck.
     saga = await author.authorSaga(taggingView);
     interpreterVersion = interpreter.interpreterVersion;
     promptVersion = interpreter.promptVersion;

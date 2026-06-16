@@ -1,5 +1,5 @@
 generated: 2026-06-14
-last_updated: 2026-06-15T18:30:00Z
+last_updated: 2026-06-15T20:15:00Z
 # 1-4 moved ready-for-dev -> in-progress -> review (dev-story) -> done (senior-review fix round 1)
 # 1-5 moved backlog -> ready-for-dev (create-story) -> done (dev-story + senior-review). Epic 1 capstone complete: epic-1 flipped in-progress -> done (all 1-1..1-5 done).
 # 2-1 moved backlog -> ready-for-dev (create-story) -> in-progress -> review (dev-story) -> done (senior-review fix round 1). Epic 2 first story; epic-2 stays in-progress.
@@ -781,4 +781,46 @@ development_status:
   # R1/R4/R5, golden snapshots byte-stable. The real full-session bake is the DEFERRED operator step AFTER
   # this lands (separate explicit OK — billed/real `claude -p`). epic-5 stays in-progress (5-7 is not the
   # Epic-5 capstone; 5-3 art + 5-4 deploy remain).
-  5-7: backlog
+  # 5-7 moved backlog -> ready-for-dev (create-story). Story file authored at
+  # _bmad-output/implementation-artifacts/5-7-chunked-interpret.md (build-surfaced, NOT in epics.md; ACs
+  # verbatim from the operator createBrief). PURE orchestrator src/interpret/chunked-interpret.ts:
+  # chunkTaggingView windows the Story 5.6 reduced TaggingViewEvent[] into bounded chunks (MAX_CHUNK_EVENTS
+  # =100 inline const, ~7 chunks for 689 events, each <35KB/chunk — far under the ~193KB whole-view one-shot
+  # that exceeds ClaudeCliClient DEFAULT_TIMEOUT_MS=600_000); interpretChunked calls the SAME 2-arg
+  # ClaudeInterpreter.interpret(chunk, FULL groundingEvents) per chunk (the 5.6 seam reused AS-IS, sourceHash
+  # /annotationHash stay over the full scrubbed events) via an INJECTED interpret callback (DI -> SDK-free,
+  # gate-testable with a FAKE), then mergeAnnotations concatenates in chunk order + dedups (eventRef+beatType,
+  # keep highest-confidence, stable first-seen tiebreak). SINGLE wiring change at build-bundle.ts:201
+  # (interpreter.interpret -> interpretChunked). Saga stays ONE-SHOT (UNTOUCHED). HARD INVARIANTS: chunked
+  # path is --cli/--real ONLY (mocked FixtureInterpreter else-branch UNTOUCHED -> public/bundles/story-10-1
+  # .json BYTE-IDENTICAL, annotationHash c10c15aa unchanged, committed-bundle*.test.ts unweakened);
+  # annotationHash/freeze over the FULL events (assembleBundle gets scrubResult as-is); BeatInterpreter
+  # interface stays single-arg; no Layer-0 code (BOTH golden snapshots byte-stable). FULLY gate-provable with
+  # a FAKE interpreter (ZERO LLM spend, the 3.2/5.6 mocked-machinery precedent): AC1 chunk coverage/bound/
+  # order/determinism; AC2 per-chunk full-grounding (sourceHash over full events) ; AC3 merge+dedup+freeze-
+  # resolves; AC4 ~689-event byte bound + chunk count; AC5 mocked-path byte-identical bundle + R1/R4/R5 +
+  # grep -ril anthropic dist/ empty + golden snapshots stable + determinism. Baseline 106 files / 1095 tests
+  # at HEAD 16fc207 (adds chunked-interpret.test.ts). The real full-session bake is the DEFERRED operator
+  # step AFTER this lands (separate explicit OK — billed/real `claude -p`). NO git commit (operator commits
+  # between stories). epic-5 stays in-progress (5-7 is not the Epic-5 capstone; 5-3 art + 5-4 deploy remain).
+  # 5-7 moved ready-for-dev -> in-progress -> review (dev-story, baseline 16fc207). Implemented the PURE
+  # chunked-interpret orchestrator (src/interpret/chunked-interpret.ts: chunkTaggingView + interpretChunked
+  # + mergeAnnotations + MAX_CHUNK_EVENTS=100) and wired the single --cli/--real interpret call in
+  # scripts/build-bundle.ts to it over the 5.6 2-arg seam (chunk=prompt, FULL scrubbed events=grounding on
+  # every call). Turned the ATDD red suite GREEN (28 tests) + fixed two ATDD-test `role:'self'` typecheck
+  # defects honestly (-> 'source', no assertion weakened). Committed bundle BYTE-IDENTICAL (annotationHash
+  # c10c15aa…); both golden snapshots byte-stable; grep -ril anthropic dist/ = NOTHING (orchestrator
+  # SDK-free + browser-unreachable). Gates: typecheck/lint clean (R1/R4/R5 hold, eslint.config.ts UNTOUCHED),
+  # 107 files / 1123 tests (+1 file/+28 = the new suite), build OK. NO git commit (operator commits between
+  # stories). The real full-session bake is the DEFERRED operator step (explicit OK after this lands).
+  # epic-5 stays in-progress (5-7 is not the Epic-5 capstone; 5-3 art + 5-4 deploy remain).
+  # 5-7 moved review -> done (senior-review fix round 1, 2026-06-15). Review APPROVED (all 5 ACs PASS); 0 high
+  # / 0 med / 2 low. F1 (fix): corrected stale test counts to verified actuals (suite 28; full 107 files /
+  # 1123 tests; delta +28 — the empty-view zero-calls guard + default-maxChunkSize wiring tests are legit
+  # coverage); doc-only. F2 (consider): documented in chunked-interpret.test.ts that the AC4 CHUNK_BYTE_BOUND
+  # assumes ASCII-payload content (escape-free 100-row chunk = 29001 bytes < 35000; escape-pathological
+  # all-quotes = 49001) — hardening, not a bug; the load-bearing RELATIVE whole-view>4x-chunk proof holds
+  # under both shapes. NO production code change. Gates re-GREEN: typecheck/lint clean, 107 files / 1123 tests,
+  # build OK, grep -ril anthropic dist/ = NOTHING, both golden snapshots byte-stable, bundle byte-identical.
+  # NO git commit. epic-5 stays in-progress (5-7 is not the Epic-5 capstone; 5-3 art + 5-4 deploy remain).
+  5-7: done
