@@ -824,3 +824,18 @@ development_status:
   # build OK, grep -ril anthropic dist/ = NOTHING, both golden snapshots byte-stable, bundle byte-identical.
   # NO git commit. epic-5 stays in-progress (5-7 is not the Epic-5 capstone; 5-3 art + 5-4 deploy remain).
   5-7: done
+  # 5-8: name-safe Saga — author over the payload-free public surface, not the snippet view (NOT in
+  # epics.md; ACs in the operator createBrief, the 5.5/5.6/5.7 build-surfaced precedent). BUILD-SURFACED
+  # privacy fix surfaced by the 5.7 real bake: the structured bundle (projectedEvents/annotations) was
+  # CLEAN, but the real Opus SAGA prose leaked real identifiers (Vibranto, auth_tokens, SaveProfileSheet,
+  # RecoverView, LogMailer, migration 0045, PUBLIC_BASE_URL, FK-23503, …) because SagaAuthor was fed the
+  # snippet-bearing reduced tagging-view (5.6 snippets are path-free + secret-scrubbed but NOT
+  # symbol/name-free). FIX: author the Saga over ONLY the name-free data the public bundle already ships —
+  # projectEvents (5.5 payload-free projection: tool/role/outcome) + the frozen beats + teaching.json — via
+  # a PURE buildSagaBrief, plus an explicit anonymization clause in the system prompt. Invariant: the Saga
+  # can leak nothing the bundle doesn't already safely expose. Interpret/beats (5.7) UNCHANGED; mocked path
+  # uses PLACEHOLDER_SAGA so committed public/bundles/story-10-1.json stays BYTE-IDENTICAL. FULLY
+  # gate-provable mocked (zero spend): brief purity/name-free/determinism, mocked SagaAuthor gets the brief,
+  # byte-identical bundle, R1/R4/R5, golden snapshots stable. The real Saga RE-BAKE (billed `claude -p`) is
+  # the operator step AFTER this lands. epic-5 stays in-progress (5-8 is not the Epic-5 capstone).
+  5-8: backlog
