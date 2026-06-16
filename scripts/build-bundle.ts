@@ -38,12 +38,21 @@
 // + deduped via interpretChunked — yet each chunk call grounds over the FULL scrubbed events, so
 // annotationHash/freeze/provenance stay over the full events (UNCHANGED). The Saga stays ONE-SHOT (it is
 // not the bottleneck). The DEFAULT mocked path never builds the view nor chunks.
+//
+// Story 5.8 — NAME-SAFE Saga (AC1): on --cli/--real the Saga is now authored over the NAME-FREE public
+// surface (buildSagaBrief over the payload-free projection + the frozen beats + teaching), NOT the
+// snippet-bearing tagging-view. The tagging-view STAYS the interpret prompt (the two diverge); the Saga
+// honors the Story 5.5 hard line (the public bundle never ships a real file/symbol name or path). The
+// DEFAULT mocked path is UNTOUCHED — it uses PLACEHOLDER_SAGA + builds no brief (committed bundle byte-identical).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ingestSession } from '../src/bundle/session-ingest';
 import { SessionManifestSchema } from '../src/bundle/session-manifest';
 import { planTranscriptSources, manifestToPlannedSources } from '../src/bundle/transcript-source-plan';
 import { buildTaggingView } from '../src/bundle/tagging-view';
+import { projectEvents } from '../src/bundle/project-events';
+import { buildSagaBrief } from '../src/scribe/saga-brief';
+import { TEACHING } from '../src/portal/teaching-config';
 import { scrubSession } from '../src/scrub/scrub';
 import {
   COMPILED_SCRUB_PATTERNS,
@@ -215,8 +224,19 @@ async function main(argv: string[]): Promise<void> {
       groundingEvents: scrubResult.scrubbedEvents,
       interpret: (chunk, grounding) => interpreter.interpret(chunk, grounding),
     });
-    // The Saga stays ONE-SHOT over the reduced view — it makes a single text completion, not the bottleneck.
-    saga = await author.authorSaga(taggingView);
+    // Story 5.8 (AC1) — the Saga is authored over the NAME-FREE public-surface brief, NOT the snippet-bearing
+    // tagging-view (which still feeds the INTERPRET prompt above — the two DIVERGE). The brief is built from
+    // the SAME payload-free projection assembleBundle ships (projectEvents over the scrubbed events) + the
+    // frozen beats (the chunked-interpret result) + the teaching concepts — name-free BY CONSTRUCTION, so the
+    // Layer-2/Told Saga honors the Story 5.5 hard line. The Saga stays ONE-SHOT (it is not the bottleneck).
+    const projectedEvents = projectEvents(scrubResult.scrubbedEvents);
+    const sagaBrief = buildSagaBrief({
+      projectedEvents,
+      annotations,
+      teaching: TEACHING,
+      battleTimeline,
+    });
+    saga = await author.authorSaga(sagaBrief);
     interpreterVersion = interpreter.interpreterVersion;
     promptVersion = interpreter.promptVersion;
   } else {

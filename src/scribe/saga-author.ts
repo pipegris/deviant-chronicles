@@ -1,16 +1,16 @@
-import type { NormalizedEvent } from '../schema/normalized-event';
-import type { TaggingViewEvent } from '../bundle/tagging-view';
+import type { SagaBrief } from './saga-brief';
 
-// Story 5.6 (AC3, §8) — the Saga PROMPT input is either the FULL NormalizedEvent[] (legacy/default) or
-// the compact reduced TaggingViewEvent[] (the bake path). The Saga makes NO truth claim and only
-// JSON.stringify's its input into the prompt (no provenance/hash), so the input is OPAQUE — this union
-// just documents the two real shapes. `import type` keeps it erased at runtime (no scribe→bundle runtime
-// import / no cycle). The reduced view already carries the per-event arc the Saga needs (tool + role +
-// outcome + snippet, in order), so it is a sufficient authoring input (the AC's "it needs the arc, not bytes").
-type SagaInput = readonly NormalizedEvent[] | readonly TaggingViewEvent[];
+// Story 5.8 (AC4, §4) — the Saga PROMPT input is the name-free SagaBrief: the public-surface projection
+// (projectedEvents → tool/role/outcome) + the frozen beats + the teaching concepts. The Story 5.7 real bake
+// leaked real identifiers because the Saga was fed the snippet-bearing reduced tagging-view; the brief is
+// name-free BY CONSTRUCTION (Story 5.5 hard line, now Layer 2). The Saga makes NO truth claim and only
+// JSON.stringify's its input into the prompt (no provenance/hash), so the input is OPAQUE — this type just
+// documents the real shape. The leak-shaped NormalizedEvent[] / TaggingViewEvent[] union members are DROPPED
+// (both production callers now pass a brief), severing the leaky type from the Saga path entirely (defense in
+// depth). `import type` keeps it erased at runtime. [Dev Notes §4]
 
 // Story 4.2 / AC1 — the OFFLINE Saga authoring logic (Layer 2, Told): calls claude-opus-4-8 for ONE
-// lush, Tolkien-register PROSE passage over the session's event window and returns it as a string.
+// lush, Tolkien-register PROSE passage over the name-free SagaBrief (Story 5.8) and returns it as a string.
 // This is the SECOND (and last) production module that touches @anthropic-ai/sdk (R4-allowed in
 // scribe/) — and, like the Story 3.2 interpreter, it imports the SDK LAZILY, only when no client is
 // injected, so the browser bundle never pulls it (the real R4 proof is the dist-grep in Task 6) and
@@ -49,7 +49,12 @@ interface ContentBlock {
 // as metadata for the operator/Story-5.2 bundle, not sent in the request body. [CLAUDE.md
 // "config-as-data … no hardcoded tuning constants"]
 const DEFAULT_MODEL = 'claude-opus-4-8';
-const DEFAULT_PROMPT_VERSION = 'saga-tolkien-v1';
+// Story 5.8 (§5) — bumped 'saga-tolkien-v1' → 'saga-tolkien-v2': the SYSTEM_PROMPT materially changed (the
+// anonymization clause), so the version stamp must change so the operator's re-baked Saga records the
+// anonymization-hardened prompt in its provenance. Metadata only — the committed bundle is unaffected (its
+// promptVersion is FIXTURE_PROMPT_VERSION = 'fixture-v1', the mocked path's PLACEHOLDER_SAGA never runs
+// SagaAuthor). Mirrors the interpreter's beat-tag-v2 precedent.
+const DEFAULT_PROMPT_VERSION = 'saga-tolkien-v2';
 // Generous, fixed ceiling for the (single, non-streaming, offline) lush passage. max_tokens is
 // REQUIRED by the Messages API. Sampling params / budget_tokens are deliberately OMITTED —
 // claude-opus-4-8 uses adaptive thinking and 400s on those. [claude-api skill]
@@ -57,18 +62,28 @@ const MAX_TOKENS = 2048;
 
 // The default Tolkien-register saga prompt — a named module constant (the established
 // claude-interpreter.ts SYSTEM_PROMPT pattern; NOT externalized to config/*.json). It instructs claude
-// to write ONE lush, elegiac/triumphant closing Saga in Tolkien register over the supplied session
-// events, faithful to the real events (no invented stakes — SM-C1), ending on the victory; the
+// to write ONE lush, elegiac/triumphant closing Saga in Tolkien register over the supplied name-free
+// brief, faithful to the real events (no invented stakes — SM-C1), ending on the victory; the
 // Forgemaiden's cry "By hammer and hash, it is done!" is an apt closing flourish. The prompt is a
 // constructor option (`systemPrompt?`) so it stays a config knob, not a buried literal. [prd.md
 // #"Aesthetic and Tone" L336-345]
+//
+// Story 5.8 (AC2, §5) — the ANONYMIZATION clause (the BELT over the already-name-free brief): the input
+// is name-free by construction, but the clause stops the model from FABRICATING a plausible real-looking
+// identifier to fill an abstract gap (e.g. inventing a "users table" when it sees a role: 'migration'
+// event). It forbids emitting OR inventing any real product/project/file/module/class/function/table/
+// column/env-var/library name and instructs fantasy/role/concept language ONLY.
 const SYSTEM_PROMPT =
   'You are the Scribe of a deterministic replay rendered as a 16-bit high-fantasy battle. ' +
-  'Read the JSON array of normalized session events and compose ONE lush, elegiac, triumphant ' +
+  'Read the JSON brief of abstracted, name-free session beats and compose ONE lush, elegiac, triumphant ' +
   'closing Saga in a measured, mythic Tolkien register — the kingdom-spanning arc of the whole ' +
   'session, culminating in the victory. Stay FAITHFUL to the real events: dramatize what happened, ' +
   'invent no stakes that the events do not bear. Render the developer as the Forgemaiden, bugs and ' +
-  'errors as curses and beasts, the fix as the binding spell. Close on the Forgemaiden’s ' +
+  'errors as curses and beasts, the fix as the binding spell. ' +
+  'The input is a deliberately ABSTRACTED, name-free battle brief — NEVER emit or invent any real ' +
+  'product, project, file, module, class, function, database table or column, environment-variable, or ' +
+  'library name; render everything in fantasy, role, and concept terms ONLY. If a real name is not in ' +
+  'the brief, you must NOT fabricate one. Close on the Forgemaiden’s ' +
   'battle cry: "By hammer and hash, it is done!" Return ONLY the Saga prose, no preamble.';
 
 export interface SagaAuthorOptions {
@@ -91,18 +106,20 @@ export class SagaAuthor {
     this.promptVersion = options.promptVersion ?? DEFAULT_PROMPT_VERSION;
   }
 
-  // Author the closing Saga over the full event window. A PLAIN text completion (no tools): the Saga
-  // is free prose. Reads the first `text` content block and returns its trimmed text. A response with
-  // no text block (a refusal / empty) THROWS — fail-loud at the authoring boundary, so a bad bake never
-  // silently writes an empty Saga (the interpreter's missing-tool_use guard, applied to prose).
-  async authorSaga(events: SagaInput): Promise<string> {
+  // Author the closing Saga over the name-free SagaBrief (Story 5.8 — the public-surface projection + beats
+  // + teaching, NOT the full events nor the snippet-bearing tagging-view; the Story 5.5 hard line for Layer
+  // 2). A PLAIN text completion (no tools): the Saga is free prose. Reads the first `text` content block and
+  // returns its trimmed text. A response with no text block (a refusal / empty) THROWS — fail-loud at the
+  // authoring boundary, so a bad bake never silently writes an empty Saga (the interpreter's missing-tool_use
+  // guard, applied to prose).
+  async authorSaga(brief: SagaBrief): Promise<string> {
     const client = await this.resolveClient();
 
     const response = await client.messages.create({
       model: this.model,
       max_tokens: MAX_TOKENS,
       system: this.systemPrompt,
-      messages: [{ role: 'user', content: JSON.stringify(events) }],
+      messages: [{ role: 'user', content: JSON.stringify(brief) }],
     });
 
     const textBlock = response.content.find(

@@ -1,6 +1,7 @@
 // OFFLINE authoring step. The browser reader is src/scribe/saga.ts (SDK-free). The thin argv/fs/stdout
-// glue that authors ONE lush Tolkien-register Saga over a session's NormalizedEvent[] and writes the
-// Saga text to disk as the artifact Story 5.2 folds into ReplayBundle.saga.
+// glue that authors ONE lush Tolkien-register Saga over a session's NAME-FREE SagaBrief (Story 5.8 — the
+// payload-free projection + teaching; beats-less here, see briefFor) and writes the Saga text to disk as
+// the artifact Story 5.2 folds into ReplayBundle.saga. The canonical bake (WITH real beats) is build-bundle.ts.
 //
 // BACKEND SELECTOR (CI-safe by default):
 //   (no flag)  the PLACEHOLDER Saga — NO LLM, NO key, NO network (the dev/CI path).
@@ -19,6 +20,9 @@ import { parseTranscript } from '../src/ingest/parse-transcript';
 import { parseJournal } from '../src/ingest/parse-journal';
 import { normalizeTranscript, normalizeJournal } from '../src/ingest/normalize';
 import { mergeStreams } from '../src/ingest/merge';
+import { projectEvents } from '../src/bundle/project-events';
+import { buildSagaBrief } from '../src/scribe/saga-brief';
+import { TEACHING } from '../src/portal/teaching-config';
 
 // Default saga model for the CLI/real bakes — claude-opus-4-8 is accepted by `claude --model`
 // verbatim. Mirrors SagaAuthor's own DEFAULT_MODEL so stdout/notices are accurate.
@@ -30,7 +34,9 @@ const PLACEHOLDER_SAGA =
   '«PLACEHOLDER SAGA — the real claude-opus-4-8 bake over the full scrubbed session is the deferred ' +
   'operator step. Run with --cli (claude -p, no key) or --real (ANTHROPIC_API_KEY) to author it.»';
 
-const DEFAULT_PROMPT_VERSION = 'saga-tolkien-v1';
+// Stamps only the no-flag PLACEHOLDER bake; kept in lockstep with SagaAuthor.DEFAULT_PROMPT_VERSION so the
+// placeholder artifact's provenance version isn't misleadingly stale. --cli/--real use author.promptVersion.
+const DEFAULT_PROMPT_VERSION = 'saga-tolkien-v2';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const i = argv.indexOf(`--${name}`);
@@ -47,6 +53,21 @@ function requireFlag(argv: string[], name: string): string {
     throw new Error(`scripts/scribe-saga.ts: missing required --${name} flag.`);
   }
   return value;
+}
+
+// Story 5.8 — build the NAME-FREE Saga brief over the public surface. This standalone baker has no interpret
+// step, so it has NO beats: it passes `annotations: []` (a beats-less brief — the build-bundle.ts --cli path
+// is the canonical bake WITH real beats; this is a convenience baker). It needs NO scrub step to be name-safe:
+// projectEvents (Story 5.5) structurally drops payload/path/name (classifyRole discards the path; toolName is
+// the abstract tool; outcome is a bool), so the projection is name-free BY CONSTRUCTION even over un-scrubbed
+// events — adding a scrub dependency here would be scope-creep for no name-safety gain (Dev Notes §3, the
+// PREFERRED minimal-correct choice). The teaching one-liners are the safe authored narrative material.
+function briefFor(events: NormalizedEvent[]) {
+  return buildSagaBrief({
+    projectedEvents: projectEvents(events),
+    annotations: [],
+    teaching: TEACHING,
+  });
 }
 
 // Resolve { saga, promptVersion } per backend. The SagaAuthor (and its SDK/CLI clients) is lazily
@@ -67,7 +88,7 @@ async function authorSaga(
       model: opts.model,
       promptVersion: opts.promptVersion,
     });
-    return { saga: await author.authorSaga(events), promptVersion: author.promptVersion };
+    return { saga: await author.authorSaga(briefFor(events)), promptVersion: author.promptVersion };
   }
 
   if (opts.real) {
@@ -77,10 +98,10 @@ async function authorSaga(
         `(model ${opts.model ?? DEFAULT_SAGA_MODEL}) over the resolved ANTHROPIC_API_KEY.\n`,
     );
     const author = new SagaAuthor({ model: opts.model, promptVersion: opts.promptVersion });
-    return { saga: await author.authorSaga(events), promptVersion: author.promptVersion };
+    return { saga: await author.authorSaga(briefFor(events)), promptVersion: author.promptVersion };
   }
 
-  // Default (CI-safe): the placeholder — no LLM, no key, no network.
+  // Default (CI-safe): the placeholder — no LLM, no key, no network. No brief is built.
   return { saga: PLACEHOLDER_SAGA, promptVersion: opts.promptVersion ?? DEFAULT_PROMPT_VERSION };
 }
 
