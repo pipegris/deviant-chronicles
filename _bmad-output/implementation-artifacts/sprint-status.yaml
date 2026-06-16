@@ -766,3 +766,19 @@ development_status:
   # snapshots (pace/+ingest/) byte-stable. NO git commit. epic-5 stays in-progress (5-3 art + 5-4 deploy
   # remain; 5-6 is not the Epic-5 capstone).
   5-6: done
+  # 5-7: chunked/windowed real-LLM interpret — enables the deferred full-session bake (NOT in epics.md;
+  # ACs authored verbatim in the operator's createBrief, the Story 5.5/5.6 build-surfaced precedent).
+  # BUILD-SURFACED fix for the ONE open thread: a single `claude -p interpret` over the whole ~689-event
+  # reduced tagging-view (Story 5.6) exceeds the 600s execFile timeout (exit 143/SIGTERM) AND can
+  # hallucinate refs over a large input. 5.7 adds a PURE orchestrator (src/interpret/chunked-interpret.ts)
+  # that windows the reduced view into bounded chunks, interprets each via the SAME 2-arg
+  # ClaudeInterpreter.interpret(promptChunk, FULL groundingEvents) so sourceHash/annotationHash stay over
+  # the full events (provenance UNCHANGED, the 5.6 contract), then merges + dedups the BeatAnnotation[].
+  # Chunked path is --cli/--real ONLY; the mocked dev/CI path (FixtureInterpreter) is UNTOUCHED so
+  # public/bundles/story-10-1.json stays BYTE-IDENTICAL. Saga stays one-shot (out of scope). FULLY
+  # gate-provable with a FAKE interpreter (ZERO LLM spend, the 3.2/5.6 mocked-machinery precedent): chunk
+  # coverage/bound, per-chunk full-grounding, merge+dedup, determinism, mocked-path byte-identical bundle,
+  # R1/R4/R5, golden snapshots byte-stable. The real full-session bake is the DEFERRED operator step AFTER
+  # this lands (separate explicit OK — billed/real `claude -p`). epic-5 stays in-progress (5-7 is not the
+  # Epic-5 capstone; 5-3 art + 5-4 deploy remain).
+  5-7: backlog
